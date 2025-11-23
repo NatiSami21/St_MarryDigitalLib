@@ -1,0 +1,52 @@
+import { db } from './sqlite';
+
+type UserInput = {
+  fayda_id: string;
+  name: string;
+  phone?: string;
+  photo_uri?: string;
+};
+
+export const upsertUser = async (user: UserInput) => {
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `INSERT INTO users (fayda_id, name, phone, photo_uri, created_at, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(fayda_id) DO UPDATE SET
+       name = excluded.name,
+       phone = excluded.phone,
+       photo_uri = excluded.photo_uri,
+       updated_at = excluded.updated_at,
+       sync_status = excluded.sync_status`,
+    [
+      user.fayda_id,
+      user.name,
+      user.phone ?? '',
+      user.photo_uri ?? '',
+      now,
+      now,
+      'pending',
+    ]
+  );
+};
+
+export const getUser = async (fayda_id: string) => {
+  return await db.getFirstAsync(
+    `SELECT * FROM users WHERE fayda_id = ?`,
+    [fayda_id]
+  );
+};
+
+export const listUsers = async () => {
+  return await db.getAllAsync(`SELECT * FROM users ORDER BY created_at DESC`);
+};
+
+export const markUsersSynced = async (ids: string[]) => {
+  if (ids.length === 0) return;
+  const placeholders = ids.map(() => '?').join(',');
+  await db.runAsync(
+    `UPDATE users SET sync_status = 'synced' WHERE fayda_id IN (${placeholders})`,
+    ids
+  );
+};
