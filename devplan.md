@@ -288,3 +288,277 @@ Goal: reliably upload pending local changes and download remote changes so multi
 * `src/services/syncService.ts` — `syncNow()` skeleton that collects pending records and logs the server response.
 
 ---
+
+---
+
+# ✅ **PHASE 1 — Offline-First Core Features (Re-Drafted & Structured @ NOV-22)**
+
+This rewritten Phase 1 includes:
+
+✔ UI + Logic
+✔ Tailwind + Reanimated for all screens
+✔ SQLite integration
+✔ Modular file structure
+✔ Based strictly on your uploaded DB + File Structure
+
+---
+
+# **1.1 Local Database CRUD (COMPLETE)**
+
+Already done earlier.
+
+---
+
+# **1.2 Book Registration (COMPLETE)**
+
+Modern UI, QR generation, gallery save.
+
+---
+
+# ⭐ **1.3 Book List & Search (Tailwind + Animated FlatList)**
+
+This is our next milestone.
+
+---
+
+## ✅ **1.3 Objective**
+
+Build a screen that allows the librarian to:
+
+* View all books
+* Search by title, author, category
+* Filter by category (optional mini-feature)
+* See availability counts
+* Navigate to Book Details
+* Responsively adapt as new books are added
+* Works fully offline
+
+This is the librarian’s main “view books” interface.
+
+---
+
+## 📁 **1.3 Files to Create**
+
+Following your file structure:
+
+```
+app/
+  books/
+    register.tsx         (done)
+    list.tsx             <-- NEW
+    details.tsx          <-- NEW (for 1.3.2)
+db/
+  books.ts               (extend with list/query functions)
+components/
+  BookCard.tsx           <-- NEW
+  SearchBar.tsx          <-- NEW
+```
+
+---
+
+# ⭐ **1.3.1 — Book List Screen**
+
+### Requirements
+
+* Animated FlatList
+* Each book card shows:
+
+  * title
+  * author
+  * category
+  * total copies
+  * available copies (later computed from transactions)
+* Tailwind styling
+* Smooth fade-in on load
+* Pull-to-refresh to reload SQLite
+* Offline first → all data comes from SQLite
+
+### Logic Layer additions (`db/books.ts`)
+
+Add:
+
+```ts
+export const getAllBooks = async () => {
+  const result = await db.getAllAsync("SELECT * FROM books ORDER BY title ASC;");
+  return result;
+};
+
+export const searchBooks = async (query: string) => {
+  const result = await db.getAllAsync(
+    `
+      SELECT * FROM books
+      WHERE title LIKE ? OR author LIKE ? OR category LIKE ?
+    `,
+    [`%${query}%`, `%${query}%`, `%${query}%`]
+  );
+
+  return result;
+};
+```
+
+---
+
+# ⭐ **1.3.2 — BookCard Component (UI)**
+
+A clean, animated card.
+
+* uses Tailwind
+* animated fade-in
+* reusable everywhere
+* tapping opens details screen
+
+---
+
+# ⭐ **1.3.3 — SearchBar Component**
+
+Features:
+
+* State-lifted value
+* Tailwind styling
+* Animated
+* Triggers SQLite search queries
+
+---
+
+# ⭐ **1.3.4 — Book List Screen Implementation**
+
+The screen (`app/books/list.tsx`) includes:
+
+* SearchBar
+* Animated FlatList
+* Pull-to-refresh
+* Navigation to `/books/details?id=xxx`
+
+---
+
+# ⭐ **1.3.5 — Book Details Screen**
+
+Not full CRUD (editing) yet, but:
+
+Shows:
+
+* Title
+* Author
+* Category
+* Notes
+* Copies
+* QR popup (show existing QR)
+* Borrow history (Phase 1.6) placeholder
+
+---
+
+# 🚀 **1.4 Borrow Flow (Scan Fayda → Scan Book)**
+
+### Steps:
+
+* Integrate Expo Barcode Scanner
+* First screen: Scan Fayda → Get user
+* Second: Scan Book → Create transaction
+* Save locally (pending_sync = 1)
+
+File additions:
+
+```
+app/borrow/
+  scanUser.tsx
+  scanBook.tsx
+```
+
+DB:
+
+```
+db/transactions.ts
+```
+
+---
+
+# 🚀 **1.5 Return Flow (Scan Book Only)**
+
+### Steps:
+
+* Scan QR of the book
+* Lookup last transaction
+* Mark as returned
+
+UI:
+
+```
+app/return/
+  scanBook.tsx
+```
+
+---
+
+# 🚀 **1.6 Local Reports (Offline)**
+
+Based on SQLite queries:
+
+* Overdue books
+* Top borrowed
+* Category counts
+* Current borrowed list
+
+File:
+
+```
+app/reports/
+  index.tsx
+```
+
+---
+
+# 🚀 **1.7 Dashboard (Home Screen)**
+
+This is the “landing page”, visually attractive:
+
+* Buttons: Register Book, Borrow, Return, Reports, Books
+* Stats snapshot:
+
+  * total books
+  * borrowed count
+  * overdue
+  * categories
+* Animated hero banner
+
+File:
+
+```
+app/index.tsx
+```
+
+---
+
+# 🚀 **1.8 Pre-Sync Hooks (Before Phase 2)**
+
+Prepare local data structure:
+
+* Mark transactions with `pending_sync`
+* Store device_id
+* Include created_at timestamps
+* Queue new users/books/transactions for sync bundle
+
+File:
+
+```
+db/syncQueue.ts
+```
+
+---
+
+# ⭐ **That's the Full Re-Drafted Phase One**
+
+Here is the complete structure:
+
+# ✅ **PHASE 1 — Final Plan**
+
+1.1 SQLite CRUD (DONE)
+1.2 Book Registration UI + QR (DONE)
+1.3 Book List + Search (CURRENT TASK)
+1.4 Borrow Flow (scan user → scan book)
+1.5 Return Flow (scan book)
+1.6 Reports (offline)
+1.7 Dashboard UI
+1.8 Local sync queue preparation
+
+---
+ 

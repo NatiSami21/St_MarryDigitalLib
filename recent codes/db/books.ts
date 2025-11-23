@@ -64,3 +64,34 @@ export const markBooksSynced = (codes: string[]) => {
     console.error('❌ Error marking books synced:', error);
   }
 };
+
+export const getAllBooks = async () => {
+  try {
+    const rows = await db.getAllAsync(
+      "SELECT * FROM books ORDER BY title ASC;"
+    );
+
+    return rows;
+  } catch (error) {
+    console.error("Error loading books:", error);
+    return [];
+  }
+};
+
+export const searchBooks = async (query: string) => {
+  try {
+    const q = `%${query}%`;
+
+    const rows = await db.getAllAsync(
+      `SELECT * FROM books
+       WHERE title LIKE ? OR author LIKE ? OR category LIKE ?
+       ORDER BY title ASC;`,
+      [q, q, q]
+    );
+
+    return rows;
+  } catch (error) {
+    console.error("Search error:", error);
+    return [];
+  }
+};
