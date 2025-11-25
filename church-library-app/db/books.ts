@@ -1,5 +1,6 @@
-import { db } from './sqlite';
-import { v4 as uuidv4 } from 'uuid';
+import { db } from './sqlite'; 
+import { randomUUID } from "expo-crypto";
+
 
 type BookInput = {
   title: string;
@@ -9,8 +10,9 @@ type BookInput = {
   copies?: number;
 };
 
-export const addBook = async (book: BookInput) => {
-  const book_code = uuidv4();
+export const addBook = async (book: BookInput) => { 
+  const book_code = randomUUID();
+
   const now = new Date().toISOString();
 
   await db.runAsync(

@@ -1,8 +1,9 @@
 import { db } from './sqlite';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from "expo-crypto";
 
 export const borrowBook = async (book_code: string, fayda_id: string, device_id: string) => {
-  const tx_id = uuidv4();
+  const tx_id = randomUUID();
+
   const timestamp = new Date().toISOString();
 
   await db.runAsync(
@@ -15,7 +16,8 @@ export const borrowBook = async (book_code: string, fayda_id: string, device_id:
 };
 
 export const returnBook = async (book_code: string, device_id: string) => {
-  const tx_id = uuidv4();
+  const tx_id = randomUUID();
+
   const timestamp = new Date().toISOString();
 
   await db.runAsync(
