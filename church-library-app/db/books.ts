@@ -65,3 +65,11 @@ export const markBooksSynced = async (codes: string[]) => {
     codes
   );
 };
+
+export async function getBookByCode(code: string) {
+  return await db.getFirstAsync(
+    `SELECT * FROM books WHERE book_code = ?`,
+    [code]
+  );
+}
+

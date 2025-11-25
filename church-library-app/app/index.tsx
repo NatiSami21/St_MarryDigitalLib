@@ -21,6 +21,16 @@ export default function Home() {
         title="Register a Book"
         onPress={() => router.push("/books/register")}
       />
+      <Button 
+        title="Book List" 
+        onPress={() => router.push("/books/list")} 
+      />
+
+      <Button 
+        title="Register User" 
+        onPress={() => router.push("/users/register")} 
+      />
+
     </View>
   );
 }

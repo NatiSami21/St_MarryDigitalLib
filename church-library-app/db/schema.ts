@@ -6,6 +6,8 @@ export const createUsersTable = `
     fayda_id TEXT UNIQUE,
     name TEXT,
     phone TEXT,
+    gender TEXT,
+    address TEXT,
     photo_uri TEXT,
     created_at TEXT,
     updated_at TEXT,

@@ -7,26 +7,38 @@ type UserInput = {
   photo_uri?: string;
 };
 
-export const upsertUser = async (user: UserInput) => {
+export const upsertUser = async (user: {
+  fayda_id: string;
+  name: string;
+  phone?: string;
+  gender?: string;
+  address?: string;
+  photo_uri?: string;
+}) => {
   const now = new Date().toISOString();
 
   await db.runAsync(
-    `INSERT INTO users (fayda_id, name, phone, photo_uri, created_at, updated_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(fayda_id) DO UPDATE SET
-       name = excluded.name,
-       phone = excluded.phone,
-       photo_uri = excluded.photo_uri,
-       updated_at = excluded.updated_at,
-       sync_status = excluded.sync_status`,
+    `
+    INSERT INTO users (fayda_id, name, phone, gender, address, photo_uri, created_at, updated_at, sync_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    ON CONFLICT(fayda_id) DO UPDATE SET
+      name = excluded.name,
+      phone = excluded.phone,
+      gender = excluded.gender,
+      address = excluded.address,
+      photo_uri = excluded.photo_uri,
+      updated_at = excluded.updated_at,
+      sync_status = 'pending'
+    `,
     [
       user.fayda_id,
       user.name,
-      user.phone ?? '',
-      user.photo_uri ?? '',
+      user.phone ?? "",
+      user.gender ?? "",
+      user.address ?? "",
+      user.photo_uri ?? "",
       now,
       now,
-      'pending',
     ]
   );
 };

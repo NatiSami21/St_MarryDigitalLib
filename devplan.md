@@ -291,274 +291,295 @@ Goal: reliably upload pending local changes and download remote changes so multi
 
 ---
 
-# ✅ **PHASE 1 — Offline-First Core Features (Re-Drafted & Structured @ NOV-22)**
+# ✅ **Phase 1 — MVP Feature Development (Updated & Clean)**
 
-This rewritten Phase 1 includes:
+This version is fully aligned with:
 
-✔ UI + Logic
-✔ Tailwind + Reanimated for all screens
-✔ SQLite integration
-✔ Modular file structure
-✔ Based strictly on your uploaded DB + File Structure
-
----
-
-# **1.1 Local Database CRUD (COMPLETE)**
-
-Already done earlier.
+✔ Final DB structure
+✔ Safe parameterized SQLite queries
+✔ Expo Router project layout
+✔ No NativeWind / animations yet
+✔ No extra dependencies
+✔ Clean minimal UI
+✔ Uses `/app` folder routing
 
 ---
 
-# **1.2 Book Registration (COMPLETE)**
+# 🚀 **PHASE 1 — MVP IMPLEMENTATION**
 
-Modern UI, QR generation, gallery save.
+## **1.1 Local Database (CRUD Layer) — DONE**
+
+Already completed and cleaned:
+
+### ✔ Implemented DB logic for:
+
+* `books.ts`
+* `users.ts`
+* `transactions.ts`
+* `syncLog.ts`
+* `schema.ts`
+* `sqlite.ts`
+
+### ✔ All rewritten to:
+
+* use `runAsync`, `getAllAsync`, `getFirstAsync`
+* remove `execSync` for CRUD
+* enable `PRAGMA foreign_keys = ON`
+* add indexes
+* avoid SQL injection
+* ensure sync-friendly timestamps and UUIDs
+
+### ✔ initDb() is working and runs from `_layout.tsx`
+
+**This layer is stable and production-safe.**
 
 ---
 
-# ⭐ **1.3 Book List & Search (Tailwind + Animated FlatList)**
+# **1.2 Book Registration (UI + Logic)**
 
-This is our next milestone.
+This is the first in-app interactive MVP screen.
 
----
+### **Features we implement now**
 
-## ✅ **1.3 Objective**
+* Input form:
+  **title, author, category, notes, copies**
+* On submit → call `addBook()`
+* Generate a simple QR code
+* Save QR to gallery
+* Show success state
 
-Build a screen that allows the librarian to:
-
-* View all books
-* Search by title, author, category
-* Filter by category (optional mini-feature)
-* See availability counts
-* Navigate to Book Details
-* Responsively adapt as new books are added
-* Works fully offline
-
-This is the librarian’s main “view books” interface.
-
----
-
-## 📁 **1.3 Files to Create**
-
-Following your file structure:
+### **Screen path**
 
 ```
-app/
-  books/
-    register.tsx         (done)
-    list.tsx             <-- NEW
-    details.tsx          <-- NEW (for 1.3.2)
-db/
-  books.ts               (extend with list/query functions)
-components/
-  BookCard.tsx           <-- NEW
-  SearchBar.tsx          <-- NEW
+app/books/register.tsx
 ```
 
----
+### **UI requirements (MVP)**
 
-# ⭐ **1.3.1 — Book List Screen**
+* Simple RN components (no animations)
+* Clean layout with padding
+* Good spacing
+* Very clear buttons
+* Error handling (Alert)
 
-### Requirements
+### **Dependencies already installed:**
 
-* Animated FlatList
-* Each book card shows:
+* `expo-media-library`
+* `expo-file-system`
+* `react-native-qrcode-svg`
 
-  * title
-  * author
-  * category
-  * total copies
-  * available copies (later computed from transactions)
-* Tailwind styling
-* Smooth fade-in on load
-* Pull-to-refresh to reload SQLite
-* Offline first → all data comes from SQLite
+After the UI is complete:
+✔ Test DB insert
+✔ Check gallery save
+✔ Confirm QR generation
 
-### Logic Layer additions (`db/books.ts`)
-
-Add:
-
-```ts
-export const getAllBooks = async () => {
-  const result = await db.getAllAsync("SELECT * FROM books ORDER BY title ASC;");
-  return result;
-};
-
-export const searchBooks = async (query: string) => {
-  const result = await db.getAllAsync(
-    `
-      SELECT * FROM books
-      WHERE title LIKE ? OR author LIKE ? OR category LIKE ?
-    `,
-    [`%${query}%`, `%${query}%`, `%${query}%`]
-  );
-
-  return result;
-};
-```
+**Only after 1.2 is stable, we move to 1.3.**
 
 ---
 
-# ⭐ **1.3.2 — BookCard Component (UI)**
+# **1.3 Book List + Search (UI + Logic)**
 
-A clean, animated card.
+### **Features**
 
-* uses Tailwind
-* animated fade-in
-* reusable everywhere
-* tapping opens details screen
-
----
-
-# ⭐ **1.3.3 — SearchBar Component**
-
-Features:
-
-* State-lifted value
-* Tailwind styling
-* Animated
-* Triggers SQLite search queries
-
----
-
-# ⭐ **1.3.4 — Book List Screen Implementation**
-
-The screen (`app/books/list.tsx`) includes:
-
-* SearchBar
-* Animated FlatList
+* Fetch all books from SQLite (`getAllBooks()`)
+* Search by title / author / category (`searchBooks()`)
+* List using FlatList
+* Simple `BookCard` component
 * Pull-to-refresh
-* Navigation to `/books/details?id=xxx`
+* No animations yet
+
+### **Screen path**
+
+```
+app/books/list.tsx
+```
+
+### **Flow**
+
+1. Load list on mount
+2. Search bar updates list
+3. Display book cards
+4. Later: add button → register new book
+5. Later: navigation to book details (Phase 2)
 
 ---
 
-# ⭐ **1.3.5 — Book Details Screen**
+# **1.4 User Registration (Fayda ID) (UI + Logic)**
 
-Not full CRUD (editing) yet, but:
+### **Features**
 
-Shows:
+* Input Fayda ID
+* Optional: name / phone
+* Optional: take one photo of ID (camera)
+* Save locally using `upsertUser()`
 
-* Title
-* Author
-* Category
-* Notes
-* Copies
-* QR popup (show existing QR)
-* Borrow history (Phase 1.6) placeholder
+### **Screen path**
+
+```
+app/users/register.tsx
+```
+
+### **Why in MVP?**
+
+* Borrowing requires a valid user
+
+⚠ Camera access tested only in Phase 1.4
+(We skip complex cropping or OCR.)
 
 ---
 
-# 🚀 **1.4 Borrow Flow (Scan Fayda → Scan Book)**
+# **1.5 Borrow / Return (QR Scanner)**
+
+### Features:
+
+* Borrow flow:
+
+  1. Scan Fayda ID barcode → lookup user
+  2. Scan book → call `borrowBook()`
+* Return flow:
+
+  1. Scan book → call `returnBook()`
+
+### **Screens**
+
+```
+app/borrow/index.tsx
+app/return/index.tsx
+```
+
+### **Logic**
+
+* Use `expo-barcode-scanner`
+* Validate user exists
+* Validate book exists
+* Save pending transactions
+
+---
+
+# **1.6 Simple Reports (Local Only)**
+
+### Screens:
+
+```
+app/reports/unreturned.tsx
+app/reports/summary.tsx
+```
+
+### Queries:
+
+* `listUnreturnedBooks()`
+* summary counts (use SELECT COUNT(…) queries)
+
+### UI:
+
+* Basic lists
+* Simple text stats
+* NO charts yet (Phase 2)
+
+---
+
+# **1.7 Manual Sync (Local → Supabase)**
 
 ### Steps:
 
-* Integrate Expo Barcode Scanner
-* First screen: Scan Fayda → Get user
-* Second: Scan Book → Create transaction
-* Save locally (pending_sync = 1)
+1. Send pending:
 
-File additions:
+   * users
+   * books
+   * transactions
+2. Receive server-confirmed status
+3. Mark rows as synced
+4. Add entry to `sync_log`
 
-```
-app/borrow/
-  scanUser.tsx
-  scanBook.tsx
-```
-
-DB:
+### Screen:
 
 ```
-db/transactions.ts
+app/sync/index.tsx
 ```
-
----
-
-# 🚀 **1.5 Return Flow (Scan Book Only)**
-
-### Steps:
-
-* Scan QR of the book
-* Lookup last transaction
-* Mark as returned
 
 UI:
 
-```
-app/return/
-  scanBook.tsx
-```
+* Button: **Sync Now**
+* Last sync timestamp
+* Logs list
 
 ---
 
-# 🚀 **1.6 Local Reports (Offline)**
+# **1.8 App Navigation (MVP Menu)**
 
-Based on SQLite queries:
-
-* Overdue books
-* Top borrowed
-* Category counts
-* Current borrowed list
-
-File:
-
-```
-app/reports/
-  index.tsx
-```
-
----
-
-# 🚀 **1.7 Dashboard (Home Screen)**
-
-This is the “landing page”, visually attractive:
-
-* Buttons: Register Book, Borrow, Return, Reports, Books
-* Stats snapshot:
-
-  * total books
-  * borrowed count
-  * overdue
-  * categories
-* Animated hero banner
-
-File:
+Temporary minimal home menu:
 
 ```
 app/index.tsx
 ```
 
----
+Items:
 
-# 🚀 **1.8 Pre-Sync Hooks (Before Phase 2)**
+* 📚 Book List
+* ➕ Register Book
+* 👤 Register User
+* 🔄 Borrow Book
+* 🔁 Return Book
+* 📝 Reports
+* ☁️ Sync
 
-Prepare local data structure:
-
-* Mark transactions with `pending_sync`
-* Store device_id
-* Include created_at timestamps
-* Queue new users/books/transactions for sync bundle
-
-File:
-
-```
-db/syncQueue.ts
-```
+We’re NOT using bottom tabs OR animations yet.
+Simple vertical menu.
 
 ---
 
-# ⭐ **That's the Full Re-Drafted Phase One**
+# **1.9 Testing Phase (Before Phase 2)**
 
-Here is the complete structure:
+We test:
 
-# ✅ **PHASE 1 — Final Plan**
+### Database
 
-1.1 SQLite CRUD (DONE)
-1.2 Book Registration UI + QR (DONE)
-1.3 Book List + Search (CURRENT TASK)
-1.4 Borrow Flow (scan user → scan book)
-1.5 Return Flow (scan book)
-1.6 Reports (offline)
-1.7 Dashboard UI
-1.8 Local sync queue preparation
+* insert, fetch, search
+* transactions
+* foreign keys
+
+### QR scanner
+
+* reading Fayda barcode
+* reading book QR
+
+### Offline behavior
+
+* borrowed/returned actions
+* restarting app
+* local data persistence
+
+### Sync
+
+* pending → synced
 
 ---
- 
+
+# **🔥 PHASE 1 OUTPUT (What we deliver)**
+
+By end of Phase 1:
+
+### ✔ Fully working offline-first library app:
+
+* Register books
+* Generate QR
+* Save QR
+* List books
+* Search books
+* Register users
+* Borrow a book
+* Return a book
+* See unreturned books
+* Manual sync button
+
+### ❗ No styling perfection
+
+### ❗ No fancy animation
+
+### ❗ No advanced conflict handling
+
+### ❗ No dashboard on the web yet
+
+These are all **Phase 2**.
+
+---
