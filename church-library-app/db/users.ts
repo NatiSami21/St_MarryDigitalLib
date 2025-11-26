@@ -1,11 +1,8 @@
-import { db } from './sqlite';
+import { db } from "./sqlite";
 
-type UserInput = {
-  fayda_id: string;
-  name: string;
-  phone?: string;
-  photo_uri?: string;
-};
+/* -------------------------------------------------------
+ * TYPES
+ * -----------------------------------------------------*/
 
 export type User = {
   fayda_id: string;
@@ -19,15 +16,28 @@ export type User = {
   sync_status: string;
 };
 
-
-export const upsertUser = async (user: {
+export type UserUpsert = {
   fayda_id: string;
   name: string;
-  phone?: string;
   gender?: string;
+  phone?: string;
   address?: string;
   photo_uri?: string;
-}) => {
+};
+
+export type UserUpdate = {
+  name: string;
+  gender?: string;
+  phone?: string;
+  address?: string;
+  photo_uri?: string | null;
+};
+
+/* -------------------------------------------------------
+ * UPSERT USER (Create or Update in one query)
+ * -----------------------------------------------------*/
+
+export async function upsertUser(user: UserUpsert): Promise<void> {
   const now = new Date().toISOString();
 
   await db.runAsync(
@@ -54,7 +64,11 @@ export const upsertUser = async (user: {
       now,
     ]
   );
-};
+}
+
+/* -------------------------------------------------------
+ * GET USER BY ID
+ * -----------------------------------------------------*/
 
 export async function getUser(fayda_id: string): Promise<User | null> {
   const row = await db.getFirstAsync(
@@ -62,30 +76,37 @@ export async function getUser(fayda_id: string): Promise<User | null> {
     [fayda_id]
   );
 
-  return row as User | null;
+  return (row as User) ?? null;
 }
 
+/* -------------------------------------------------------
+ * LIST USERS
+ * -----------------------------------------------------*/
 
-export const listUsers = async () => {
-  return await db.getAllAsync(`SELECT * FROM users ORDER BY created_at DESC`);
-};
-
-export const markUsersSynced = async (ids: string[]) => {
-  if (ids.length === 0) return;
-  const placeholders = ids.map(() => '?').join(',');
-  await db.runAsync(
-    `UPDATE users SET sync_status = 'synced' WHERE fayda_id IN (${placeholders})`,
-    ids
+export async function listUsers(): Promise<User[]> {
+  const rows = await db.getAllAsync(
+    `SELECT * FROM users ORDER BY created_at DESC`
   );
-};
 
-export async function getAllUsers() {
-  return await db.getAllAsync(`SELECT * FROM users ORDER BY created_at DESC`);
+  return rows as User[];
 }
 
-export async function searchUsers(query: string) {
+export async function getAllUsers(): Promise<User[]> {
+  const rows = await db.getAllAsync(
+    `SELECT * FROM users ORDER BY created_at DESC`
+  );
+
+  return rows as User[];
+}
+
+/* -------------------------------------------------------
+ * SEARCH USERS
+ * -----------------------------------------------------*/
+
+export async function searchUsers(query: string): Promise<User[]> {
   const q = `%${query}%`;
-  return await db.getAllAsync(
+
+  const rows = await db.getAllAsync(
     `
     SELECT * FROM users
     WHERE name LIKE ? OR fayda_id LIKE ? OR phone LIKE ?
@@ -93,25 +114,49 @@ export async function searchUsers(query: string) {
     `,
     [q, q, q]
   );
+
+  return rows as User[];
 }
 
-export async function updateUser(fayda_id: string, updates: any) {
+/* -------------------------------------------------------
+ * MARK USERS AS SYNCED
+ * -----------------------------------------------------*/
+
+export async function markUsersSynced(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const placeholders = ids.map(() => "?").join(",");
+
+  await db.runAsync(
+    `UPDATE users SET sync_status = 'synced' WHERE fayda_id IN (${placeholders})`,
+    ids
+  );
+}
+
+/* -------------------------------------------------------
+ * UPDATE USER
+ * -----------------------------------------------------*/
+
+export async function updateUser(
+  fayda_id: string,
+  updates: UserUpdate
+): Promise<void> {
   const now = new Date().toISOString();
 
   await db.runAsync(
-    `UPDATE users
-     SET name = ?, gender = ?, phone = ?, address = ?, photo_uri = ?, updated_at = ?
-     WHERE fayda_id = ?`,
+    `
+    UPDATE users
+    SET name = ?, gender = ?, phone = ?, address = ?, photo_uri = ?, updated_at = ?
+    WHERE fayda_id = ?
+    `,
     [
       updates.name,
-      updates.gender,
-      updates.phone,
-      updates.address,
-      updates.photo_uri || "",
+      updates.gender ?? "",
+      updates.phone ?? "",
+      updates.address ?? "",
+      updates.photo_uri ?? "",
       now,
       fayda_id,
     ]
   );
 }
-
-
