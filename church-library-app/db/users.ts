@@ -7,6 +7,19 @@ type UserInput = {
   photo_uri?: string;
 };
 
+export type User = {
+  fayda_id: string;
+  name: string;
+  gender?: string;
+  phone?: string;
+  address?: string;
+  photo_uri?: string;
+  created_at: string;
+  updated_at: string;
+  sync_status: string;
+};
+
+
 export const upsertUser = async (user: {
   fayda_id: string;
   name: string;
@@ -43,12 +56,15 @@ export const upsertUser = async (user: {
   );
 };
 
-export const getUser = async (fayda_id: string) => {
-  return await db.getFirstAsync(
+export async function getUser(fayda_id: string): Promise<User | null> {
+  const row = await db.getFirstAsync(
     `SELECT * FROM users WHERE fayda_id = ?`,
     [fayda_id]
   );
-};
+
+  return row as User | null;
+}
+
 
 export const listUsers = async () => {
   return await db.getAllAsync(`SELECT * FROM users ORDER BY created_at DESC`);
@@ -78,3 +94,24 @@ export async function searchUsers(query: string) {
     [q, q, q]
   );
 }
+
+export async function updateUser(fayda_id: string, updates: any) {
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `UPDATE users
+     SET name = ?, gender = ?, phone = ?, address = ?, photo_uri = ?, updated_at = ?
+     WHERE fayda_id = ?`,
+    [
+      updates.name,
+      updates.gender,
+      updates.phone,
+      updates.address,
+      updates.photo_uri || "",
+      now,
+      fayda_id,
+    ]
+  );
+}
+
+
