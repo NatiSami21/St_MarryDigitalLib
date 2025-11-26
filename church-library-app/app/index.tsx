@@ -30,6 +30,11 @@ export default function Home() {
         title="Register User" 
         onPress={() => router.push("/users/register")} 
       />
+      
+      <Button 
+        title="User List" 
+        onPress={() => router.push("/users/list")}
+      />
 
     </View>
   );

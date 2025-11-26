@@ -62,3 +62,19 @@ export const markUsersSynced = async (ids: string[]) => {
     ids
   );
 };
+
+export async function getAllUsers() {
+  return await db.getAllAsync(`SELECT * FROM users ORDER BY created_at DESC`);
+}
+
+export async function searchUsers(query: string) {
+  const q = `%${query}%`;
+  return await db.getAllAsync(
+    `
+    SELECT * FROM users
+    WHERE name LIKE ? OR fayda_id LIKE ? OR phone LIKE ?
+    ORDER BY name ASC
+    `,
+    [q, q, q]
+  );
+}
