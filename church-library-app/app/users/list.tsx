@@ -47,7 +47,7 @@ export default function UserListScreen() {
 
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
-      onPress={() => router.push(`./users/${item.fayda_id}`)}
+      onPress={() => router.push(`/users/${item.fayda_id}`)}
       style={{
         backgroundColor: "white",
         flexDirection: "row",
