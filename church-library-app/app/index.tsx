@@ -41,6 +41,11 @@ export default function Home() {
         onPress={() => router.push("/borrow")}
       />
 
+      <Button 
+        title="Return a Book" 
+        onPress={() => router.push("/return")}
+      />
+
     </View>
   );
 }

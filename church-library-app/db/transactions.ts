@@ -73,7 +73,7 @@ export async function borrowBook(fayda_id: string, book_code: string) {
 // 2. Get Active Borrow (if any)
 // ---------------------------------------------
 export async function getActiveBorrow(fayda_id: string, book_code: string) {
-  const tx = await db.getFirstAsync(
+  const tx = await db.getFirstAsync<Transaction>(
     `SELECT * FROM transactions
      WHERE fayda_id = ? AND book_code = ? AND returned_at IS NULL`,
     [fayda_id, book_code]
@@ -86,10 +86,49 @@ export async function getActiveBorrow(fayda_id: string, book_code: string) {
 // 3. List all borrows for a user
 // ---------------------------------------------
 export async function getUserBorrows(fayda_id: string) {
-  return await db.getAllAsync(
+  return await db.getAllAsync<Transaction>(
     `SELECT * FROM transactions
      WHERE fayda_id = ?
      ORDER BY borrowed_at DESC`,
     [fayda_id]
   );
+}
+
+// ---------------------------------------------
+// 4. Complete Return
+// ---------------------------------------------
+export async function completeReturn(tx_id: string) {
+  const now = new Date().toISOString();
+
+  // 1. Get the borrow record
+  const record = await db.getFirstAsync<Transaction>(
+    `SELECT * FROM transactions WHERE tx_id = ?`,
+    [tx_id]
+  );
+
+  if (!record) {
+    throw new Error("Transaction not found.");
+  }
+
+  if (record.returned_at !== null) {
+    throw new Error("This book is already returned.");
+  }
+
+  // 2. Update transaction as returned
+  await db.runAsync(
+    `UPDATE transactions
+     SET returned_at = ?, sync_status = 'pending'
+     WHERE tx_id = ?`,
+    [now, tx_id]
+  );
+
+  // 3. Restore book inventory
+  await db.runAsync(
+    `UPDATE books
+     SET copies = copies + 1, updated_at = ?
+     WHERE book_code = ?`,
+    [now, record.book_code]
+  );
+
+  return true;
 }
