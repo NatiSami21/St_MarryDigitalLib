@@ -38,12 +38,17 @@ export const createTransactionsTable = `
     fayda_id TEXT,
     type TEXT CHECK(type IN ('borrow','return')),
     timestamp TEXT,
+    returned_at TEXT,
+    borrowed_at TEXT,
+    status TEXT DEFAULT 'borrowed',
     device_id TEXT,
-    sync_status TEXT,
+    sync_status TEXT DEFAULT 'pending',
+    
     FOREIGN KEY (book_code) REFERENCES books(book_code),
     FOREIGN KEY (fayda_id) REFERENCES users(fayda_id)
   );
 `;
+
 
 export const createSyncLogTable = `
   CREATE TABLE IF NOT EXISTS sync_log (

@@ -1,10 +1,10 @@
-// app/users/scan.tsx
+// app/books/scan.tsx
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 
-export default function ScanFayda() {
+export default function ScanBook() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const router = useRouter();
@@ -37,14 +37,14 @@ export default function ScanFayda() {
         }}
         onBarcodeScanned={(result) => {
           if (scanned) return;
-
           setScanned(true);
-          const id = result.data;
+
+          const code = result.data;
 
           router.replace({
             pathname: "/borrow",
             params: {
-              fayda_id: id,
+              book_code: code,
               scan_id: Date.now(), // 🔥 Unique scan event
             },
           });
@@ -61,7 +61,7 @@ export default function ScanFayda() {
           borderRadius: 10,
         }}
       >
-        <Text style={{ color: "white", fontSize: 16 }}>Scan Fayda / ID</Text>
+        <Text style={{ color: "white", fontSize: 16 }}>Scan Book QR</Text>
       </View>
     </View>
   );

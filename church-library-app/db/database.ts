@@ -1,74 +1,72 @@
 // db/database.ts
 import * as SQLite from 'expo-sqlite';
 
-// Initialize database with proper typing
-export function initializeDatabase() {
-  const db = SQLite.openDatabaseSync('library.db');
-  
-  db.withTransactionSync(() => {
-    // Create tables
-    db.execSync(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fayda_id TEXT UNIQUE,
-        name TEXT,
-        phone TEXT,
-        gender TEXT,
-        address TEXT,
-        photo_uri TEXT,
-        created_at TEXT,
-        updated_at TEXT,
-        sync_status TEXT
-      );
-    `);
-    
-    db.execSync(`
-      CREATE TABLE IF NOT EXISTS books (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        book_code TEXT UNIQUE,
-        title TEXT,
-        author TEXT,
-        category TEXT,
-        notes TEXT,
-        copies INTEGER DEFAULT 1,
-        created_at TEXT,
-        updated_at TEXT,
-        sync_status TEXT
-      );
-    `);
-    
-    // Add other tables...
-    
-    console.log('✅ Database initialized successfully');
-  });
-}
-
 // Migration function using new API
 export function migrateDatabase() {
-  const db = SQLite.openDatabaseSync('library.db');
-  
+  const db = SQLite.openDatabaseSync("library.db");
+
   try {
     db.withTransactionSync(() => {
-      // Try to add missing columns
+      // ---- USERS TABLE MIGRATIONS (already done before) ----
       try {
         db.execSync("ALTER TABLE users ADD COLUMN gender TEXT;");
-        console.log('✅ Added gender column');
-      } catch (e: any) {
-        if (!e.message?.includes('duplicate column name')) {
-          console.log('ℹ️ Gender column already exists');
-        }
-      }
-      
+      } catch {}
       try {
         db.execSync("ALTER TABLE users ADD COLUMN address TEXT;");
-        console.log('✅ Added address column');
+      } catch {}
+
+      // ---- TRANSACTIONS TABLE MIGRATIONS ----
+
+      // returned_at
+      try {
+        db.execSync("ALTER TABLE transactions ADD COLUMN returned_at TEXT;");
+        console.log("✅ Added returned_at column");
       } catch (e: any) {
-        if (!e.message?.includes('duplicate column name')) {
-          console.log('ℹ️ Address column already exists');
-        }
+        if (!e.message.includes("duplicate column name"))
+          console.log("ℹ️ returned_at already exists");
+      }
+
+      // status
+      try {
+        db.execSync(
+          "ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'borrowed';"
+        );
+        console.log("✅ Added status column");
+      } catch (e: any) {
+        if (!e.message.includes("duplicate column name"))
+          console.log("ℹ️ status already exists");
+      }
+
+      // borrowed_at
+      try {
+        db.execSync("ALTER TABLE transactions ADD COLUMN borrowed_at TEXT;");
+        console.log("✅ Added borrowed_at column");
+      } catch (e: any) {
+        if (!e.message.includes("duplicate column name"))
+          console.log("ℹ️ borrowed_at already exists");
+      }
+
+      // device_id (optional)
+      try {
+        db.execSync("ALTER TABLE transactions ADD COLUMN device_id TEXT;");
+        console.log("✅ Added device_id column");
+      } catch (e: any) {
+        if (!e.message.includes("duplicate column name"))
+          console.log("ℹ️ device_id already exists");
+      }
+
+      // sync_status default
+      try {
+        db.execSync(
+          "ALTER TABLE transactions ADD COLUMN sync_status TEXT DEFAULT 'pending';"
+        );
+        console.log("✅ Added sync_status column");
+      } catch (e: any) {
+        if (!e.message.includes("duplicate column name"))
+          console.log("ℹ️ sync_status already exists");
       }
     });
   } catch (error) {
-    console.error('Migration failed:', error);
+    console.error("Migration failed:", error);
   }
 }

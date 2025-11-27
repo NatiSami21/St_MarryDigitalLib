@@ -1,13 +1,12 @@
-import { Stack } from 'expo-router';
-import { useEffect } from 'react';
-import { initDb } from '../db/sqlite';
-
-//import { migrateDatabase } from '../db/database';
+import { Stack } from "expo-router";
+import { useEffect } from "react";
+import { initDb } from "../db/sqlite";
+//import { migrateDatabase } from "../db/database";
 
 export default function Layout() {
   useEffect(() => {
     initDb();
-    //migrateDatabase();
+    //migrateDatabase();  // ← enable once
   }, []);
 
   return <Stack screenOptions={{ headerShown: false }} />;

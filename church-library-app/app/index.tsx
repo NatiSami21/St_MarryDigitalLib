@@ -36,6 +36,11 @@ export default function Home() {
         onPress={() => router.push("/users/list")}
       />
 
+      <Button 
+        title="Borrow a Book" 
+        onPress={() => router.push("/borrow")}
+      />
+
     </View>
   );
 }
