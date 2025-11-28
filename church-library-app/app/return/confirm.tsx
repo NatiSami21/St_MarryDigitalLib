@@ -65,7 +65,7 @@ export default function ConfirmReturn() {
     Alert.alert("Success", "Book Returned Successfully!", [
       {
         text: "OK",
-        onPress: () => router.replace("./transactions"),
+        onPress: () => router.replace("/transactions"),
       },
     ]);
 

@@ -111,21 +111,7 @@ export default function UserDetailsScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => router.push(`./transactions/borrow?user=${user.fayda_id}`)}
-        style={{
-          backgroundColor: "#1e40af",
-          padding: 15,
-          borderRadius: 10,
-          marginBottom: 15,
-        }}
-      >
-        <Text style={{ color: "white", textAlign: "center", fontSize: 16, fontWeight: "600" }}>
-          Borrow a Book
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={() => router.push(`./transactions/history/${user.fayda_id}`)}
+        onPress={() => router.push(`/transactions/history/${user.fayda_id}`)}
         style={{
           backgroundColor: "#374151",
           padding: 15,

@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 
 import QRCode from "react-native-qrcode-svg";
@@ -129,6 +130,28 @@ export default function BookDetails() {
           <Button title="Save QR to Gallery" onPress={saveQrToGallery} />
         </View>
       </View>
+
+      <TouchableOpacity
+        onPress={() => router.push(`/books/history/${book.book_code}`)}
+        style={{
+          backgroundColor: "#374151",
+          padding: 15,
+          borderRadius: 10,
+          marginTop: 15,
+        }}
+      >
+        <Text
+          style={{
+            color: "white",
+            textAlign: "center",
+            fontSize: 16,
+            fontWeight: "600",
+          }}
+        >
+          View Borrow History
+        </Text>
+      </TouchableOpacity>
+
 
       <View style={{ marginTop: 40 }}>
         <Button title="Back to Books" onPress={() => router.push("/books/list")} />

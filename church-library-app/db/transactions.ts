@@ -7,6 +7,7 @@ import type { Book } from "../types/Book";
 export type Transaction = {
   tx_id: string;
   book_code: string;
+  title: string;
   fayda_id: string;
   borrowed_at: string;
   returned_at?: string | null;
@@ -131,4 +132,88 @@ export async function completeReturn(tx_id: string) {
   );
 
   return true;
+}
+
+// ---------------------------------------------
+// 5. List ALL transactions
+// ---------------------------------------------
+export async function getAllTransactions() {
+  return await db.getAllAsync(`
+    SELECT 
+      t.*, 
+      b.title AS book_title,
+      u.name AS user_name
+    FROM transactions t
+    LEFT JOIN books b ON t.book_code = b.book_code
+    LEFT JOIN users u ON t.fayda_id = u.fayda_id
+    ORDER BY t.borrowed_at DESC
+  `);
+}
+
+// ---- Active Transactions ----
+export async function getActiveTransactions() {
+  return await db.getAllAsync(`
+    SELECT 
+      t.*, 
+      b.title AS book_title,
+      u.name AS user_name
+    FROM transactions t
+    LEFT JOIN books b ON t.book_code = b.book_code
+    LEFT JOIN users u ON t.fayda_id = u.fayda_id
+    WHERE t.returned_at IS NULL
+    ORDER BY t.borrowed_at DESC
+  `);
+}
+
+// ---- Returned Transactions ----
+export async function getReturnedTransactions() {
+  return await db.getAllAsync(`
+    SELECT 
+      t.*, 
+      b.title AS book_title,
+      u.name AS user_name
+    FROM transactions t
+    LEFT JOIN books b ON t.book_code = b.book_code
+    LEFT JOIN users u ON t.fayda_id = u.fayda_id
+    WHERE t.returned_at IS NOT NULL
+    ORDER BY t.borrowed_at DESC
+  `);
+}
+
+// ---------------------------------------------
+// 8. Get per-user history
+// ---------------------------------------------
+export async function getUserHistory(fayda_id: string) {
+  return await db.getAllAsync(
+    `
+    SELECT 
+      t.*, 
+      b.title AS book_title
+    FROM transactions t
+    LEFT JOIN books b ON t.book_code = b.book_code
+    WHERE t.fayda_id = ?
+    ORDER BY t.borrowed_at DESC
+    `,
+    [fayda_id]
+  );
+}
+
+// ---------------------------------------------
+// LIST ALL BORROWS FOR A BOOK
+// ---------------------------------------------
+export async function getBookHistory(book_code: string) {
+  return await db.getAllAsync(
+    `
+    SELECT
+      t.*,
+      u.name AS user_name,
+      b.title AS book_title
+    FROM transactions t
+    LEFT JOIN users u ON t.fayda_id = u.fayda_id
+    LEFT JOIN books b ON t.book_code = b.book_code
+    WHERE t.book_code = ?
+    ORDER BY t.borrowed_at DESC
+    `,
+    [book_code]
+  );
 }

@@ -65,7 +65,7 @@ export default function ConfirmBorrow() {
     Alert.alert("Success", "Book Borrowed Successfully!", [
       {
         text: "OK",
-        onPress: () => router.replace("./transactions"),
+        onPress: () => router.replace("/transactions"),
       },
     ]);
 
