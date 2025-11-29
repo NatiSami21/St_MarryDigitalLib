@@ -4,6 +4,9 @@ import { db } from "./sqlite";
 import { randomUUID } from "expo-crypto";
 import type { Book } from "../types/Book"; 
 
+import { appendCommit } from "./commits";
+import { runAsync } from "./sqlite";
+
 export type Transaction = {
   tx_id: string;
   book_code: string;
@@ -98,38 +101,48 @@ export async function getUserBorrows(fayda_id: string) {
 // ---------------------------------------------
 // 4. Complete Return
 // ---------------------------------------------
-export async function completeReturn(tx_id: string) {
+export interface ReturnArgs {
+  fayda_id: string;
+  book_code: string;
+  librarian_username: string;
+  device_id: string;
+}
+
+export async function completeReturn({
+  fayda_id,
+  book_code,
+  librarian_username,
+  device_id
+}: ReturnArgs): Promise<boolean> {
   const now = new Date().toISOString();
 
-  // 1. Get the borrow record
-  const record = await db.getFirstAsync<Transaction>(
-    `SELECT * FROM transactions WHERE tx_id = ?`,
-    [tx_id]
-  );
+  // 1. Find active transaction
+  const record = await getActiveBorrow(fayda_id, book_code);
 
   if (!record) {
-    throw new Error("Transaction not found.");
+    throw new Error("Active borrow record not found.");
   }
 
-  if (record.returned_at !== null) {
-    throw new Error("This book is already returned.");
-  }
-
-  // 2. Update transaction as returned
-  await db.runAsync(
-    `UPDATE transactions
-     SET returned_at = ?, sync_status = 'pending'
+  // 2. Mark transaction as returned
+  await runAsync(
+    `UPDATE transactions SET returned_at = ?, sync_status = 'pending'
      WHERE tx_id = ?`,
-    [now, tx_id]
+    [now, record.tx_id]
   );
 
-  // 3. Restore book inventory
-  await db.runAsync(
-    `UPDATE books
-     SET copies = copies + 1, updated_at = ?
-     WHERE book_code = ?`,
-    [now, record.book_code]
+  // 3. Restore book stock
+  await runAsync(
+    `UPDATE books SET copies = copies + 1, updated_at = ? WHERE book_code = ?`,
+    [now, book_code]
   );
+
+  // 4. Log commit for sync
+  await appendCommit({
+    librarian_username,
+    device_id,
+    type: "return_book",
+    payload: { book_code, fayda_id }
+  });
 
   return true;
 }
