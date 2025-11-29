@@ -13,6 +13,8 @@ import {
   getReturnedTransactions,
 } from "../../db/transactions";
 
+import { events } from "../../utils/events";
+
 export default function TransactionsScreen() {
   const [tab] = useState<"all" | "active" | "returned">("all");
   const [activeTab, setActiveTab] = useState(tab);
@@ -23,6 +25,11 @@ export default function TransactionsScreen() {
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  useEffect(() => {
+  const sub = events.listen("refresh-transactions", loadData);
+  return () => sub.remove();
+}, []);
 
   const loadData = async () => {
     setLoading(true);

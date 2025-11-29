@@ -5,6 +5,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import PhotoPicker from "../../components/PhotoPicker";
 import { upsertUser } from "../../db/users";
 
+import { events } from "../../utils/events";
+
 export default function RegisterUser() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -35,6 +37,9 @@ export default function RegisterUser() {
       });
 
       Alert.alert("Success", "User saved successfully");
+      
+      events.emit("refresh-users");
+
       router.push("/");
     } catch (err) {
       console.log(err);

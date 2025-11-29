@@ -4,6 +4,9 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "rea
 import { useRouter } from "expo-router";
 import { getDashboardStats, DashboardStats } from "../db/dashboard";
 
+import { events } from "../utils/events"; 
+
+
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -25,6 +28,14 @@ export default function Dashboard() {
     load();
     // optional: reload when screen focus in future
   }, []);
+
+  useEffect(() => {
+  const sub = events.listen("refresh-dashboard", () => {
+    load();   //reload dashboard numbers
+  });
+
+  return () => sub.remove();
+}, []);
 
   if (loading || !stats) {
     return (
@@ -124,6 +135,21 @@ export default function Dashboard() {
         >
           <Text style={{ color: "white", textAlign: "center", fontWeight: "800" }}>Transactions</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push("/reports")}
+          style={{ minWidth: "48%", margin: "1%", backgroundColor: "#6e621cff", padding: 14, borderRadius: 10 }}
+        >
+          <Text style={{ color: "white", textAlign: "center", fontWeight: "800" }}>Print Report</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push("/books/inventory")}
+          style={{ minWidth: "48%", margin: "1%", backgroundColor: "#401c6eff", padding: 14, borderRadius: 10 }}
+        >
+          <Text style={{ color: "white", textAlign: "center", fontWeight: "800" }}>Inventory</Text>
+        </TouchableOpacity>
+
       </View>
     </ScrollView>
   );

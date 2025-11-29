@@ -12,6 +12,8 @@ import BookCard from "../../components/BookCard";
 import { Book } from "../../types/Book";
 import { getAllBooks, searchBooks } from "../../db/books";
 
+import { events } from "../../utils/events";
+
 export default function BookList() {
   const router = useRouter();
 
@@ -45,6 +47,11 @@ export default function BookList() {
   useEffect(() => {
     loadBooks();
   }, []);
+
+  useEffect(() => {
+    const sub = events.listen("refresh-books", loadBooks);
+  return () => sub.remove();
+}, []);
 
   return (
     <View style={{ flex: 1, padding: 20 }}>

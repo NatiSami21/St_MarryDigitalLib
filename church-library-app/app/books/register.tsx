@@ -10,6 +10,8 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { addBook } from "../../db/books";
 
+import { events } from "../../utils/events";
+
 export default function RegisterBook() {
   const router = useRouter();
 
@@ -91,6 +93,10 @@ export default function RegisterBook() {
 
       setCreatedBookCode(code);
       Alert.alert("Success", "Book added successfully!");
+
+      events.emit("refresh-books");
+      events.emit("refresh-dashboard");
+
     } catch (err) {
       Alert.alert("Error", "Failed to add book.");
       console.log("Book add error:", err);

@@ -73,3 +73,48 @@ export async function getBookByCode(code: string) {
   );
 }
 
+// Get full inventory with borrowed_now
+export async function getInventory() {
+  return await db.getAllAsync(`
+    SELECT 
+      b.book_code,
+      b.title,
+      b.author,
+      b.category,
+      b.copies AS total_copies,
+      (
+        SELECT COUNT(*) 
+        FROM transactions t 
+        WHERE t.book_code = b.book_code AND t.returned_at IS NULL
+      ) AS borrowed_now
+    FROM books b
+    ORDER BY b.title ASC
+  `);
+}
+
+// Search inventory by title/author/category/code
+export async function searchInventory(query: string) {
+  const like = `%${query}%`;
+  return await db.getAllAsync(
+    `
+    SELECT 
+      b.book_code,
+      b.title,
+      b.author,
+      b.category,
+      b.copies AS total_copies,
+      (
+        SELECT COUNT(*) 
+        FROM transactions t 
+        WHERE t.book_code = b.book_code AND t.returned_at IS NULL
+      ) AS borrowed_now
+    FROM books b
+    WHERE b.title LIKE ?
+       OR b.author LIKE ?
+       OR b.category LIKE ?
+       OR b.book_code LIKE ?
+    ORDER BY b.title ASC
+    `,
+    [like, like, like, like]
+  );
+}

@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { getUser } from "../../db/users";
 import { getBook } from "../../db/books";
 import { borrowBook, getActiveBorrow } from "../../db/transactions";
+import { events } from "../../utils/events";
 
 function toStringParam(v: string | string[] | undefined): string {
   if (!v) return "";
@@ -68,6 +69,10 @@ export default function ConfirmBorrow() {
         onPress: () => router.replace("/transactions"),
       },
     ]);
+
+    events.emit("refresh-dashboard");
+    events.emit("refresh-books");
+    events.emit("refresh-transactions");
 
     setProcessing(false);
   };

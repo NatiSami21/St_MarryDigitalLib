@@ -15,6 +15,8 @@ import { getUser } from "../../db/users";
 import { getBook } from "../../db/books";
 import { getActiveBorrow, completeReturn } from "../../db/transactions";
 
+import { events } from "../../utils/events";
+
 function toStringParam(v: string | string[] | undefined): string {
   if (!v) return "";
   return Array.isArray(v) ? v[0] : v;
@@ -68,6 +70,9 @@ export default function ConfirmReturn() {
         onPress: () => router.replace("/transactions"),
       },
     ]);
+    
+    events.emit("refresh-dashboard");
+    events.emit("refresh-transactions");
 
     setProcessing(false);
   };
