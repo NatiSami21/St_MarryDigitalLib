@@ -1,4 +1,4 @@
-## Phase 0 — Setup & Project Foundation (what we start with)
+## Beza dingl mariam, Phase 0 — Setup & Project Foundation (what we start with)
 
 Goal: create a reproducible project scaffold, local DB bootstrap, and remote Supabase skeleton so subsequent work is fast.
 
@@ -60,9 +60,9 @@ Goal: create a reproducible project scaffold, local DB bootstrap, and remote Sup
 * Project builds and launches in Expo Go with placeholder screens.
 * SQLite tables are created on first run.
 * Supabase project exists with empty tables and keys accessible for dev.
-
+            
 ---
-
+             
 ## Phase 1 — Core MVP (book/user register, borrow/return, local DB, QR gen/scan)
 
 Goal: shipping the core offline flows described in the proposal.

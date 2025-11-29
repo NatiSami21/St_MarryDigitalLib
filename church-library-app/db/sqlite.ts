@@ -61,6 +61,23 @@ export function getAllAsync<T = any>(
 }
 
 /* ----------------------------------------------------
+ * Helper: getOneAsync - Get single row
+ * -------------------------------------------------- */
+export function getOneAsync<T = any>(
+  sql: string,
+  params: any[] = []
+): Promise<T | null> {
+  return new Promise((resolve, reject) => {
+    try {
+      const rows = db.getAllSync(sql, params) as T[];
+      resolve(rows.length > 0 ? rows[0] : null);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/* ----------------------------------------------------
  * Helper: execSync (wrapper for multi-SQL)
  * -------------------------------------------------- */
 export function execSync(sql: string) {

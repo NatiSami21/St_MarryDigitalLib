@@ -1,32 +1,21 @@
 // lib/session.ts
 import * as SecureStore from "expo-secure-store";
 
-const SESSION_KEY = "churchlib_current_librarian";
+export type SessionPayload = {
+  username: string;
+  role: "admin" | "librarian";
+  loggedInAt: number; // timestamp
+};
 
-export async function persistSession(librarianId: number) {
-  try {
-    await SecureStore.setItemAsync(SESSION_KEY, String(librarianId));
-  } catch (err) {
-    console.warn("persistSession error:", err);
-  }
+export async function saveSession(session: SessionPayload): Promise<void> {
+  await SecureStore.setItemAsync("session", JSON.stringify(session));
 }
 
-export async function clearSession() {
-  try {
-    await SecureStore.deleteItemAsync(SESSION_KEY);
-  } catch (err) {
-    console.warn("clearSession error:", err);
-  }
+export async function getSession(): Promise<SessionPayload | null> {
+  const v = await SecureStore.getItemAsync("session");
+  return v ? (JSON.parse(v) as SessionPayload) : null;
 }
 
-export async function getSession(): Promise<number | null> {
-  try {
-    const v = await SecureStore.getItemAsync(SESSION_KEY);
-    if (!v) return null;
-    const n = Number(v);
-    return Number.isNaN(n) ? null : n;
-  } catch (err) {
-    console.warn("getSession error:", err);
-    return null;
-  }
+export async function clearSession(): Promise<void> {
+  await SecureStore.deleteItemAsync("session");
 }

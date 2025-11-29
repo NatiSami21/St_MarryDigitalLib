@@ -172,42 +172,455 @@ Responsibilities:
 
 # 4 — Client UI & flow changes (what screens to add/update)
 
-### Screens to add:
+---
 
-* `app/auth/bootstrap.tsx` — “Initial bootstrap required” UI (internet required)
-* `app/auth/login.tsx` — day-to-day login screen (username + PIN)
-* `app/admin/manage-librarians.tsx` — admin-only UI to create/delete librarians
-* `app/admin/device-management.tsx` — list device bindings, revoke device
-* `app/auth/change-pin.tsx` — optional (but safe to include)
-* Update `app/index.tsx` to show Dashboard if logged in, otherwise `login`
-* Update `_layout.tsx` startup to run `migrateDatabase()` and check initialization status
+---
 
-### Flow integration:
+# 🔵 **I. FIRST-INSTALL FLOWS (BOOTSTRAP) — TWO VARIATIONS**
 
-* On app start, `_layout.tsx` calls `initDb()` -> `runMigrations()` -> check `librarians` table for any non-deleted admin.
+Your logic says:
 
-  * If none OR `meta.initialized !== true` → route to `/auth/bootstrap`
-  * Else route to `/auth/login`
+### ✔ New librarian can activate device on first install
 
-* **Bootstrap flow**:
+### ✔ But only if admin created their account in cloud beforehand
 
-  1. User chooses “Begin Setup (Online Required)”
-  2. App opens `/auth/bootstrap` which calls server `POST /bootstrap` (see server endpoints below)
-  3. After pulling server snapshot, show login screen — **only admin accounts allowed at this step** (DiguwaSoft or any admin existing on server)
-  4. On admin login success (server verifies pin), store admin locally (pin_salt/pin_hash), mark `meta.initialized = true` and store `last_pulled_commit`.
-  5. Route to admin dashboard.
+### ✔ Only one device allowed per librarian
 
-* **Normal day-to-day login**:
+### ✔ Must change PIN after activation
 
-  * Username + PIN validated locally via `db/auth.ts -> verifyLibrarian()`
-  * On success, create SecureStore session token and navigate to appropriate dashboard (admin flag toggles Admin menu).
+This is now fully enforced.
 
-* **Device binding rule**:
+---
 
-  * When a librarian first logs in successfully, if their `device_id` is `NULL`, bind this device (write device id to `librarians.device_id` and create commit).
-  * If device_id exists and differs from current device id → deny login and show message: "Account bound to another device, contact admin".
+# 🟦 **A. NEW LIBRARIAN FIRST-INSTALL FLOW**
 
-* **Admin can unbind a device** from their Manage Librarians screen.
+This is used when:
+
+* Admin added librarian on admin dashboard
+* Librarian installs app on new phone
+* Device is empty → app must bootstrap
+
+### 🔥 This is the most important flow — and we now follow it exactly.
+
+---
+
+## **STEP 1 — App startup → Detect FIRST INSTALL**
+
+We check:
+
+```
+if (!meta.initialized) OR librarians table empty:
+    show /auth/bootstrap
+```
+
+---
+
+## **STEP 2 — `/auth/bootstrap` screen**
+
+UI:
+
+* Title: *“Initial Setup Required”*
+* Message: **Needs internet**
+* Button: “Begin Setup (Online Required)”
+
+User presses button → next step
+
+---
+
+## **STEP 3 — Show LOGIN (cloud authentication)**
+
+This is **not** the day-to-day local login.
+This login is for **cloud activation only**.
+
+UI asks:
+
+* Username
+* PIN
+
+This can be:
+
+* New librarian with temporary PIN
+* Admin
+* Default Admin (`DiguwaSoft`, 1366)
+
+---
+
+## **STEP 4 — Client sends activation request**
+
+```
+POST /auth/activate
+{
+    username,
+    pin,
+    device_id
+}
+```
+
+server returns:
+
+### When success:
+
+* Verified credentials
+* Verified role
+* Device binding OK
+* Snapshot of:
+
+  * books
+  * users
+  * librarians
+  * commits
+* last_pulled_commit
+* required PIN change flag
+
+### When fail:
+
+* `invalid_username`
+* `invalid_pin`
+* `device_mismatch`
+* `deleted_user`
+* etc.
+
+---
+
+## **STEP 5 — Apply server snapshot locally**
+
+Client wipes or merges relevant tables:
+
+* librarians
+* users
+* books
+* transactions
+* commits
+* meta
+
+then sets:
+
+```
+meta.initialized = true
+meta.last_pulled_commit = server value
+meta.device_id = device_id
+```
+
+Now device is activated.
+
+---
+
+## **STEP 6 — FORCE Change PIN (mandatory)**
+
+Admin-created PIN is temporary.
+We protect against stolen temp PIN.
+
+UI: `/auth/change-pin`
+Inputs:
+
+* old PIN
+* new PIN
+* confirm new PIN
+
+Client updates:
+
+* local SQLite (pin_hash, pin_salt)
+
+Also sends:
+
+```
+POST /auth/change-pin
+```
+
+Success → dashboard.
+
+---
+
+## **STEP 7 — Redirect to appropriate dashboard**
+
+If role = librarian → go to main dashboard
+If role = admin → go to admin dashboard
+
+---
+
+# 🟦 **B. FIRST-INSTALL BY ADMIN (including DiguwaSoft)**
+
+Identical steps, except:
+
+* Admin enters username & PIN at activation
+* Does NOT need to change PIN (optional)
+* Can immediately manage librarians
+
+---
+
+# 🔵 **II. DAY-TO-DAY FLOWS (OFFLINE-FIRST)**
+
+Exactly matching Overall app flow.md.
+
+---
+
+# 🟦 **1) Day-to-day Login**
+
+User sees:
+
+```
+/auth/login
+```
+
+Input: username + 4-digit PIN
+
+Client performs:
+
+✔ Lookup username in `librarians`
+✔ Hash PIN with stored salt
+✔ Verify hash
+✔ Check device binding
+
+If OK → create SecureStore session:
+
+```
+currentUser = username
+sessionToken = random
+```
+
+Navigate:
+
+* admin → admin dashboard
+* librarian → dashboard
+
+No internet required.
+
+---
+
+# 🟦 **2) Borrow / Return / Edit Users / Add Books**
+
+All local.
+All create commit logs.
+
+Commit example:
+
+```
+{
+  commit_id,
+  op_type: "borrow",
+  payload: {...},
+  librarian_id,
+  timestamp
+}
+```
+
+These remain “pending” until sync.
+
+---
+
+# 🟦 **3) Admin Functions — Day-to-day**
+
+Admin can:
+
+* create librarians
+* create admins
+* soft delete librarians
+* unbind devices
+* view commits
+* revert recent commits
+* sync now
+* view analytics
+* manage shifts
+
+All actions create commits.
+
+---
+
+### **PHASE 1.15.4.1**
+
+`/auth/bootstrap.tsx`
+`/auth/login-cloud.tsx`
+activation client logic
+PIN change mandatory logic
+snapshot apply logic
+
+### **PHASE 1.15.4.2**
+
+`/auth/login.tsx` (day-to-day offline login)
+
+### **PHASE 1.15.4.3**
+
+Admin dashboard entry points
+
+### **PHASE 1.15.4.4**
+
+Manage librarians
+
+### **PHASE 1.15.4.5**
+
+Device management
+
+### **PHASE 1.15.4.6**
+
+Change PIN page
+
+### **PHASE 1.15.4.7**
+
+layout/index integration
+
+---
+
+---
+
+Perfect — everything is fully aligned and validated.
+We are ready to **begin implementation of Phase 1.15.4.1**, following the exact logic you approved.
+
+Before I generate the code, here is a clear breakdown of what we will implement in this step.
+
+---
+
+# ✅ **PHASE 1.15.4.1 — IMPLEMENTATION CONTENTS**
+
+This phase includes **four major components**:
+
+---
+
+# 1) `/auth/bootstrap.tsx`
+
+A clean and attractive UI in your blue theme:
+
+### Responsibilities:
+
+* Detect first-install state
+* Show welcome/setup message
+* Inform user internet is required
+* “Begin Setup (Online Required)” button
+* On press → navigate to `/auth/login-cloud`
+
+### UX:
+
+* Large icon / illustration
+* App name
+* Blue button
+* Clean white background
+
+---
+
+# 2) `/auth/login-cloud.tsx`
+
+This is the **Activation Login** screen.
+
+### Responsibilities:
+
+* Inputs for Username + PIN
+* “Activate Device” button
+* After submit:
+
+```
+POST /auth/activate {
+   username,
+   pin,
+   device_id
+}
+```
+
+### Handles server responses:
+
+* invalid credentials
+* device mismatch
+* success → receives snapshot + role + requiredPinChange flag
+
+### On success:
+
+Navigate → `/auth/apply-snapshot` (we will embed this in the logic file)
+
+---
+
+# 3) Activation logic
+
+A module: `lib/activation.ts`
+
+### Responsibilities:
+
+```ts
+applySnapshotToLocalDB(snapshot)
+saveMeta()
+saveLocalLibrarianCredentials()
+bindDeviceIfNeeded()
+```
+
+Snapshot includes:
+
+* books
+* users
+* librarians
+* commits (optional)
+* last_pulled_commit
+
+---
+
+# 4) **Mandatory PIN Change Screen**
+
+`/auth/change-pin.tsx`
+
+### Responsibilities:
+
+* old PIN (temporary)
+* new PIN
+* confirm new PIN
+* validate match
+* update:
+
+```
+local SQLite -> update pin_hash, salt
+POST /auth/change-pin
+```
+
+### After success:
+
+Go to dashboard based on role.
+
+---
+
+# 💙 DESIGN LANGUAGE
+
+* Attractive **blue gradient** or blue solid header
+* White cards
+* Rounded corners
+* Clean spacing
+* No animation yet (saved for Phase 2)
+
+---
+
+Notes / assumptions:
+
+I used process.env.EXPO_PUBLIC_ONLINE_MODE === "true" to toggle online mode. Make sure your .env contains EXPO_PUBLIC_ONLINE_MODE=true when you want real server calls. Default is mocked.
+
+These files use your existing DB helpers runAsync, getAllAsync, and execSync exported from db/sqlite.ts. I call runAsync for parameterized inserts/updates so you avoid SQL string building.
+
+The mocked snapshot is minimal but representative (books, users, librarians); adjust fields to match your real server snapshot shape.
+
+After snapshot apply, the activation flow sets meta.initialized = 1 and meta.last_pulled_commit.
+
+I kept UI styling consistent with your blue theme and simple card layout (no animations).
+
+---
+
+---
+
+✅ Now proceeding to PHASE 1.15.4.2
+/auth/login.tsx — Day-to-Day OFFLINE Login
+
+(No network required, uses local SQLite & PIN hashing.)
+
+This screen is used after device is initialized.
+It performs:
+
+Lookup local librarian by username
+
+Verify device binding
+
+Hash & compare PIN
+
+Store session (SecureStore)
+
+Redirect based on role:
+
+admin → /admin
+
+librarian → /
+
+---
 
 ---
 
@@ -220,23 +633,19 @@ Even if you don’t implement server now, plan for these endpoints so the bootst
   * Request: { device_id, app_version }
   * Response: snapshot { books, users, librarians, commits, last_commit_id, server_time }
   * Purpose: initial pull.
-
 * `POST /auth/admin-login`
 
   * Request: { username, pin }
   * Response: { success, token, librarian_data } (server verifies pin)
   * Purpose: allow admin bootstrap login (server-side authoritative)
-
 * `POST /sync/commits`
 
   * Request: { device_id, commits: [ ... ] }
   * Response: { applied_commits, new_commits, conflict_info }
   * Purpose: push client commits and receive remote commits
-
 * `GET /commits/since/:commit_id`
 
   * Purpose: fetch new commits since last known commit.
-
 * `POST /librarians/create` (admin-only)
 
   * Create librarian on server (adds salt/hash), returns confirmation.
