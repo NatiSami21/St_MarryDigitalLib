@@ -1,6 +1,7 @@
 // db/commits.ts
 import { runAsync, getAllAsync } from "./sqlite";
 import { v4 as uuid } from "uuid";
+import { db } from "./sqlite";
 
 export interface CommitPayload {
   librarian_username: string;
@@ -24,4 +25,13 @@ export async function appendCommit({
   );
 
   return commitId;
+}
+
+export async function addCommit(action: string, table: string, payload: any) {
+  const ts = Date.now();
+
+  await db.runAsync(
+    `INSERT INTO pending_commits (action, table_name, payload, timestamp) VALUES (?, ?, ?, ?)`,
+    [action, table, JSON.stringify(payload), ts]
+  );
 }

@@ -624,6 +624,367 @@ librarian → /
 
 ---
 
+Home Dashboard (Librarian + Admin Shared)
+
+We keep one unified dashboard but add Admin Button if role === 'admin'.
+
+Phase 1.15.4.3
+
+✔ Unified home dashboard
+✔ Admin-only Administration button
+✔ Clean, stable routing logic
+✔ Works perfectly with bootstrap flow
+✔ Blue UI theme
+
+---
+
+---
+
+PHASE 1.15.4.5 — Manage Librarians
+
+✔ List librarians
+✔ Add librarian
+✔ Soft-delete
+✔ Reset PIN
+✔ Unbind device
+(Every action creates a commit)
+
+PHASE 1.15.4.6 — Device Management
+
+✔ View all device bindings
+✔ Unbind a device
+✔ Audit device activity
+
+A) Manage Librarians (recommended first)
+B) Device Management
+C) Sync Control
+D) Commit Logs
+E) Shifts
+F) Analytics
+------------
+
+---
+
+---
+
+# ✅ **PHASE 1.15.4.5 — Manage Librarians**
+
+Admin features to implement:
+
+✔ List librarians
+✔ Add librarian
+✔ Soft delete
+✔ Reset PIN
+✔ Unbind device
+✔ Every action produces a commit in `pending_commits` table
+✔ All operations are **offline-first**
+✔ UI fully matches our admin theme
+
+We will define:
+
+1. **Folder + File Structure**
+2. **Data Flow (offline-first)**
+3. **Screen-by-screen UI definitions**
+4. **DB Query Requirements**
+5. **Commit Log Requirements**
+6. **API interaction (mock unless ONLINE_MODE=true)**
+7. **Edge cases & validations**
+
+---
+
+# 📁 **1. Folder & File Structure**
+
+```
+/app
+  /admin
+    /librarians
+      list.tsx
+      add.tsx
+      details.tsx     ← where reset PIN, delete, unbind appear
+```
+
+---
+
+# 🔵 **2. Data Flow (Offline-first)**
+
+### **Local DB is the source of truth**
+
+All librarians are in table:
+
+```
+librarians (
+  id INTEGER PRIMARY KEY,
+  username TEXT UNIQUE,
+  full_name TEXT,
+  role TEXT,           // "admin" or "librarian"
+  device_id TEXT NULL,
+  deleted INTEGER DEFAULT 0,
+  salt TEXT NULL,
+  pin_hash TEXT NULL
+)
+```
+
+### All modifications follow the pattern:
+
+#### **1. Update local DB**
+
+#### **2. Insert a commit into `pending_commits`**
+
+Commit example:
+
+```json
+{
+  "table": "librarians",
+  "action": "update",
+  "payload": { ... },
+  "timestamp": 1730000000000
+}
+```
+
+### **3. If ONLINE_MODE = true → also hit API**
+
+Else: mock success.
+
+This ensures full offline-first behavior.
+
+---
+
+# 🖥️ **3. Screens UI & Logic (No code yet)**
+
+## **A) librarians/list.tsx — List Librarians**
+
+### **Purpose**
+
+* Admin sees all librarians
+* Soft-deleted are hidden
+* Tapping one → open details screen
+
+### **UI**
+
+* Header: **“Librarians”**
+* Search box (optional Phase 2, not now)
+* Card list:
+
+Card example:
+
+```
+[Full Name] (username)
+Role: Admin / Librarian
+Device: Bound / Not Bound
+```
+
+### **Buttons**
+
+* “Add New Librarian” → /admin/librarians/add
+* Each row is clickable → /admin/librarians/details?id=XY
+
+### **Logic**
+
+* Query local db: `getAllLibrarians()`
+* Hide deleted rows (`deleted = 0`)
+* Show device binding (device_id != null)
+
+---
+
+## **B) librarians/add.tsx — Add Librarian**
+
+### **Input Fields**
+
+* Full name
+* Username
+* PIN (4–6 digits)
+* Role: dropdown (Admin, Librarian)
+
+### **Flow**
+
+1. Validate:
+
+   * Username must be unique
+   * PIN numeric & length OK
+2. Generate salt
+3. Hash PIN (`hashPin(pin, salt)`)
+4. Insert into local DB
+5. Insert commit:
+
+```
+action: "insert"
+table: "librarians"
+payload: {...}
+```
+
+6. If ONLINE_MODE=true → call POST `/admin/create-librarian`
+
+### **Navigation**
+
+After success → redirect to list screen.
+
+---
+
+## **C) librarians/details.tsx — Actions for 1 librarian**
+
+Displays:
+
+* Full name
+* Username
+* Role
+* Device binding status
+* Deleted or active
+* Last login (optional later phase)
+
+### **Buttons**
+
+#### ✔ Reset PIN
+
+* Input → new PIN
+* Re-hash → update local DB
+* Create commit:
+
+  ```
+  action: "update"
+  field: "pin_hash"
+  ```
+
+#### ✔ Unbind Device
+
+* Set `device_id = null` in DB
+* Create commit:
+
+  ```
+  action: "unbind_device"
+  ```
+
+#### ✔ Soft Delete Librarian
+
+* Set `deleted = 1`
+* Create commit:
+
+  ```
+  action: "soft_delete"
+  ```
+
+All actions show confirmation modal before executing.
+
+---
+
+# 🟧 **4. DB Queries Needed (To be implemented next)**
+
+You will need these new query functions:
+
+### **list.tsx**
+
+* `getAllLibrarians()`
+
+### **add.tsx**
+
+* `insertLibrarian(item)`
+* `isUsernameTaken(username)`
+
+### **details.tsx**
+
+* `getLibrarianById(id)`
+* `updateLibrarian(id, fields)`
+* `softDeleteLibrarian(id)`
+* `unbindLibrarianDevice(id)`
+* `updateLibrarianPin(id, salt, hash)`
+
+---
+
+# 🟩 **5. Commit Log Requirements**
+
+Every action must:
+
+1. Update local DB immediately
+2. Insert commit:
+
+Fields:
+
+```
+id (auto)
+type (librarian_add / librarian_update / librarian_delete / unbind_device)
+payload JSON
+timestamp
+synced = 0
+```
+
+3. If ONLINE_MODE=true → call remote API
+4. If offline → commit waits in storage
+
+---
+
+# 🔄 **6. ONLINE_MODE Integration**
+
+Add at file top:
+
+```ts
+import { ONLINE_MODE } from "../../../config";
+import { mockSuccess, postToServer } from "../../../utils/online";
+```
+
+### For every action:
+
+```
+if (ONLINE_MODE) {
+  await postToServer(...)
+} else {
+  mockSuccess(...)
+}
+```
+
+This is consistent with previous flows.
+
+---
+
+# 🧩 **7. Edge Cases & Validation Rules**
+
+### Add librarian
+
+* Username must be unique
+* PIN must be numeric, min 4, max 6
+* Role only “librarian” or “admin”
+
+### Reset PIN
+
+* Enforce strong PIN rules
+* Never show old PIN
+
+### Soft delete
+
+* Admin cannot delete himself
+* Admin cannot delete last remaining admin
+
+### Unbind device
+
+* If not bound → show warning
+* Confirm twice: “This allows login from any device.”
+
+---
+
+# 🎉 Summary: Final Deliverables of Phase 1.15.4.5 (No Code)
+
+You now have:
+
+* **Full UI flow**
+* **All required screens**
+* **All DB operations**
+* **All commit log actions**
+* **Offline-first interaction rules**
+* **ONLINE_MODE integration**
+* **Edge-case handling**
+
+---
+
+# 🚀 NEXT STEP (You choose)
+
+Now I can generate **actual code** for:
+
+### A) `/admin/librarians/list.tsx`
+
+### B) `/admin/librarians/add.tsx`
+
+### C) `/admin/librarians/details.tsx`
+
+Which one should I implement first?
+
 # 5 — Server API endpoints (sketch; server must exist)
 
 Even if you don’t implement server now, plan for these endpoints so the bootstrap works and later sync works:

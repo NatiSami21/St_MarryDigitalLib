@@ -1,4 +1,3 @@
-// app/index.tsx
 import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
@@ -15,7 +14,7 @@ export default function Index() {
     const bootstrap = async () => {
       const session = await getSession();
 
-      // No session → go to login
+      // NO SESSION → go to offline login
       if (!session) {
         router.replace("./auth/login");
         return;
@@ -23,14 +22,14 @@ export default function Index() {
 
       const user = await getLibrarianByUsername(session.username);
 
-      // Local DB invalid → clear and login
+      // USER NO LONGER EXISTS LOCALLY → session invalid
       if (!user || user.deleted === 1) {
         await clearSession();
         router.replace("./auth/login");
         return;
       }
 
-      // Device binding check
+      // DEVICE BINDING CHECK
       const deviceId = await getMetaValue("device_id");
       if (user.device_id && user.device_id !== deviceId) {
         await clearSession();
@@ -38,19 +37,19 @@ export default function Index() {
         return;
       }
 
-      // Session expiry check (default 12h)
+      // SESSION EXPIRES AFTER 12 HOURS
       const age = Date.now() - (session.loggedInAt ?? 0);
-      const expiry = 12 * 60 * 60 * 1000;
+      const maxAge = 12 * 60 * 60 * 1000;
 
-      if (age > expiry) {
+      if (age > maxAge) {
         await clearSession();
         router.replace("./auth/login");
         return;
       }
 
-      // Navigate based on role
+      // ROLE-BASED ROUTING
       if (user.role === "admin") {
-        router.replace("./admin");
+        router.replace("./home"); // ADMIN ALSO SEES SAME HOME BUT WITH ADMIN BUTTON
       } else {
         router.replace("./home");
       }

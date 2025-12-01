@@ -43,12 +43,10 @@ export const createTransactionsTable = `
     status TEXT DEFAULT 'borrowed',
     device_id TEXT,
     sync_status TEXT DEFAULT 'pending',
-    
     FOREIGN KEY (book_code) REFERENCES books(book_code),
     FOREIGN KEY (fayda_id) REFERENCES users(fayda_id)
   );
 `;
-
 
 export const createSyncLogTable = `
   CREATE TABLE IF NOT EXISTS sync_log (
@@ -60,7 +58,50 @@ export const createSyncLogTable = `
   );
 `;
 
-// Indexes to speed up searches and lookups
+export const createLibrariansTable = `
+  CREATE TABLE IF NOT EXISTS librarians (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('admin','librarian')),
+    device_id TEXT NULL,
+    salt TEXT,
+    pin_hash TEXT,
+    deleted INTEGER DEFAULT 0
+  );
+`;
+
+export const createMetaTable = `
+  CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+`;
+
+export const createPendingCommitsTable = `
+  CREATE TABLE IF NOT EXISTS pending_commits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    synced INTEGER DEFAULT 0
+  );
+`;
+
+export const createCommitsTable = `
+  CREATE TABLE IF NOT EXISTS commits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    commit_id TEXT UNIQUE NOT NULL,
+    librarian_username TEXT,
+    device_id TEXT,
+    type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    pushed INTEGER DEFAULT 0
+  );
+`;
+
 export const createIndexesSql = [
   `CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);`,
   `CREATE INDEX IF NOT EXISTS idx_books_author ON books(author);`,
@@ -68,5 +109,5 @@ export const createIndexesSql = [
   `CREATE INDEX IF NOT EXISTS idx_users_fayda ON users(fayda_id);`,
   `CREATE INDEX IF NOT EXISTS idx_transactions_txid ON transactions(tx_id);`,
   `CREATE INDEX IF NOT EXISTS idx_transactions_book ON transactions(book_code);`,
-  `CREATE INDEX IF NOT EXISTS idx_transactions_fayda ON transactions(fayda_id);`,
+  `CREATE INDEX IF NOT EXISTS idx_transactions_fayda ON transactions(fayda_id);`
 ];

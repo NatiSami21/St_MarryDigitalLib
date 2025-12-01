@@ -5,7 +5,11 @@ import {
   createBooksTable,
   createTransactionsTable,
   createSyncLogTable,
-  createIndexesSql,
+  createLibrariansTable,
+  createMetaTable,
+  createPendingCommitsTable,
+  createCommitsTable,
+  createIndexesSql
 } from "./schema";
 
 export const db = SQLite.openDatabaseSync("library.db");
@@ -20,8 +24,13 @@ export const initDb = () => {
     db.execSync(createBooksTable);
     db.execSync(createTransactionsTable);
     db.execSync(createSyncLogTable);
+    db.execSync(createLibrariansTable);
 
-    createIndexesSql.forEach((sql) => db.execSync(sql));
+    db.execSync(createMetaTable);
+    db.execSync(createPendingCommitsTable);
+    db.execSync(createCommitsTable);
+
+    createIndexesSql.forEach(sql => db.execSync(sql));
 
     console.log("✅ SQLite DB initialized successfully");
   } catch (error) {
@@ -29,9 +38,7 @@ export const initDb = () => {
   }
 };
 
-/* ----------------------------------------------------
- * Helper: runAsync → Simulated async wrapper
- * -------------------------------------------------- */
+// async wrappers
 export function runAsync(sql: string, params: any[] = []): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
@@ -43,13 +50,7 @@ export function runAsync(sql: string, params: any[] = []): Promise<void> {
   });
 }
 
-/* ----------------------------------------------------
- * Helper: getAllAsync
- * -------------------------------------------------- */
-export function getAllAsync<T = any>(
-  sql: string,
-  params: any[] = []
-): Promise<T[]> {
+export function getAllAsync<T = any>(sql: string, params: any[] = []): Promise<T[]> {
   return new Promise((resolve, reject) => {
     try {
       const rows = db.getAllSync(sql, params) as T[];
@@ -60,13 +61,7 @@ export function getAllAsync<T = any>(
   });
 }
 
-/* ----------------------------------------------------
- * Helper: getOneAsync - Get single row
- * -------------------------------------------------- */
-export function getOneAsync<T = any>(
-  sql: string,
-  params: any[] = []
-): Promise<T | null> {
+export function getOneAsync<T = any>(sql: string, params: any[] = []): Promise<T | null> {
   return new Promise((resolve, reject) => {
     try {
       const rows = db.getAllSync(sql, params) as T[];
@@ -77,16 +72,10 @@ export function getOneAsync<T = any>(
   });
 }
 
-/* ----------------------------------------------------
- * Helper: execSync (wrapper for multi-SQL)
- * -------------------------------------------------- */
 export function execSync(sql: string) {
   db.execSync(sql);
 }
 
-/* ----------------------------------------------------
- * Sync transaction wrapper
- * -------------------------------------------------- */
 export function withTransactionSync(fn: () => void) {
   db.withTransactionSync(fn);
 }

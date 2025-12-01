@@ -1,22 +1,31 @@
-// app/index.tsx
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
+
 import { getDashboardStats, DashboardStats } from "../../db/dashboard";
+import { getSession } from "../../lib/session";
+import { getLibrarianByUsername } from "../../db/queries/librarians";
+import { events } from "../../utils/events";
 
-import { events } from "../../utils/events"; 
-
-
-export default function Dashboard() {
+export default function HomeDashboard() {
   const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
       const s = await getDashboardStats();
       setStats(s);
+
+      const session = await getSession();
+      if (session) {
+        const user = await getLibrarianByUsername(session.username);
+        setIsAdmin(user?.role === "admin");
+      }
+
     } catch (err) {
       console.log("Dashboard load error:", err);
     } finally {
@@ -26,16 +35,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    // optional: reload when screen focus in future
   }, []);
 
   useEffect(() => {
-  const sub = events.listen("refresh-dashboard", () => {
-    load();   //reload dashboard numbers
-  });
-
-  return () => sub.remove();
-}, []);
+    const sub = events.listen("refresh-dashboard", () => {
+      load();
+    });
+    return () => sub.remove();
+  }, []);
 
   if (loading || !stats) {
     return (
@@ -70,7 +77,24 @@ export default function Dashboard() {
         Library Dashboard
       </Text>
 
-      {/* Top stat cards */}
+      {/* Admin Panel Button */}
+      {isAdmin && (
+        <TouchableOpacity
+          onPress={() => router.push("./admin")}
+          style={{
+            backgroundColor: "#1e3a8a",
+            padding: 14,
+            borderRadius: 10,
+            marginBottom: 20,
+          }}
+        >
+          <Text style={{ color: "white", fontSize: 16, textAlign: "center", fontWeight: "800" }}>
+            Administration
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Stat Cards */}
       <View style={{ flexDirection: "row", marginBottom: 12 }}>
         <Card title="Total Books" value={stats.totalBooks} />
         <Card title="Total Users" value={stats.totalUsers} color="#0ea5a4" />
@@ -94,10 +118,10 @@ export default function Dashboard() {
       {/* Placeholder chart */}
       <View style={{ backgroundColor: "white", padding: 14, borderRadius: 12, marginBottom: 14, elevation: 3 }}>
         <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>Activity (Placeholder)</Text>
-        <Text style={{ color: "#6b7280" }}>Charts will be added in Phase 2 — for now this is a placeholder.</Text>
+        <Text style={{ color: "#6b7280" }}>Charts will be added in Phase 2.</Text>
       </View>
 
-      {/* Quick actions */}
+      {/* Quick Actions */}
       <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>Quick Actions</Text>
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 40 }}>
@@ -149,7 +173,6 @@ export default function Dashboard() {
         >
           <Text style={{ color: "white", textAlign: "center", fontWeight: "800" }}>Inventory</Text>
         </TouchableOpacity>
-
       </View>
     </ScrollView>
   );
