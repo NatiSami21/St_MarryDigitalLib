@@ -9,7 +9,9 @@ import {
   createMetaTable,
   createPendingCommitsTable,
   createCommitsTable,
-  createIndexesSql
+  createIndexesSql,
+  createShiftsTable,
+  createShiftAttendanceTable
 } from "./schema";
 
 export const db = SQLite.openDatabaseSync("library.db");
@@ -29,6 +31,10 @@ export const initDb = () => {
     db.execSync(createMetaTable);
     db.execSync(createPendingCommitsTable);
     db.execSync(createCommitsTable);
+
+    db.execSync(createShiftsTable);
+    db.execSync(createShiftAttendanceTable);
+
 
     createIndexesSql.forEach(sql => db.execSync(sql));
 

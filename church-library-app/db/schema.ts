@@ -102,6 +102,39 @@ export const createCommitsTable = `
   );
 `;
 
+// SHIFT DEFINITIONS
+export const createShiftsTable = `
+  CREATE TABLE IF NOT EXISTS shifts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    librarian_username TEXT NOT NULL,
+    date TEXT NOT NULL,              -- YYYY-MM-DD
+    start_time TEXT NOT NULL,        -- HH:mm
+    end_time TEXT NOT NULL,          -- HH:mm
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER DEFAULT 0,
+
+    FOREIGN KEY(librarian_username) REFERENCES librarians(username)
+  );
+`;
+
+// SHIFT ATTENDANCE LOG
+export const createShiftAttendanceTable = `
+  CREATE TABLE IF NOT EXISTS shift_attendance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    librarian_username TEXT NOT NULL,
+    shift_id INTEGER NOT NULL,
+    clock_in INTEGER,
+    clock_out INTEGER,
+    status TEXT,                     -- on_time / late / absent / incomplete
+    synced INTEGER DEFAULT 0,
+
+    FOREIGN KEY(librarian_username) REFERENCES librarians(username),
+    FOREIGN KEY(shift_id) REFERENCES shifts(id)
+  );
+`;
+
+
 export const createIndexesSql = [
   `CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);`,
   `CREATE INDEX IF NOT EXISTS idx_books_author ON books(author);`,

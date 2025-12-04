@@ -972,18 +972,768 @@ You now have:
 * **Edge-case handling**
 
 ---
+---
 
-# 🚀 NEXT STEP (You choose)
+# 🔵 **PHASE 1.15.4.6 — Device Management**
+ 
+---
 
-Now I can generate **actual code** for:
+# 📘 **DRAFT PLAN — Device Management Module**
 
-### A) `/admin/librarians/list.tsx`
+The goal is to enable admins to:
 
-### B) `/admin/librarians/add.tsx`
+1. **View all devices currently bound to librarians**
+2. **Inspect device details**
+3. **Unbind a device** (so librarian must reactivate)
+4. **Rebind device to another librarian** (optional in Phase 1)
+5. **Rename device** (optional)
+6. **Commit logs for all changes**
 
-### C) `/admin/librarians/details.tsx`
+Devices are **not a separate table** in Phase 1 — because devices are simply:
 
-Which one should I implement first?
+### ✔ `librarians.device_id`
+
+Each librarian has:
+
+* **username**
+* **role**
+* **device_id** (string or null)
+
+So a “device” = “the phone currently bound to a librarian”.
+
+**Later (Phase 2)** we may add a dedicated `devices` table, but for Phase 1 this is not required.
+
+---
+
+# 🟦 **DEVICE MANAGEMENT SPECIFICATION**
+
+## **1. List Devices**
+
+We simply list all librarians that have `device_id != null`.
+
+Display:
+
+* Librarian full name
+* Username
+* Role
+* Device ID
+* Last sync time (optional from meta)
+
+---
+
+## **2. Unbind Device**
+
+Update:
+
+```sql
+UPDATE librarians SET device_id = NULL WHERE id = ?
+```
+
+Create a commit:
+
+```json
+{
+  "action": "unbind_device",
+  "table": "librarians",
+  "payload": { "id": librarian_id }
+}
+```
+
+After unbinding, the librarian:
+
+* Can still use the app until logout, BUT
+* On next login → device mismatch → forced cloud activation
+
+---
+
+## **3. Rebind Device (Optional Phase 1)**
+
+We can allow:
+
+* Admin selects librarian A → Set device_id to some new value
+* OR copy from another librarian (if transferring shared phone)
+
+For Phase 1, **we’ll implement:**
+
+* “Rebind manually: Enter new Device ID”
+
+Phase 2:
+
+* Auto-detect
+* Transfer A → B
+
+---
+
+## **4. Rename Device**
+
+Not needed because device_id is defined by OS.
+Optional for later.
+
+---
+
+## **5. Device Details Screen**
+
+Shows:
+
+* Librarian
+* Role
+* Device ID
+* Last sync
+* Actions
+
+  * Unbind
+  * Rebind
+  * View logs
+
+---
+
+# 🔵 **DB CHANGES NEEDED**
+
+Good news:
+
+### **We do NOT need new tables.**
+
+Everything can use existing:
+
+* **librarians** (device_id stored here)
+* **pending_commits** (for unbind / rebind logs)
+* **commits.ts** (already supports actions)
+
+BUT we need some new **queries**:
+
+---
+
+# 🟦 **DB LAYER IMPLEMENTATION PLAN**
+
+We will add these to:
+`db/queries/devices.ts` (new file)
+
+### ✔ 1. `getAllDevices()`
+
+Returns all librarians with a device:
+
+```sql
+SELECT * FROM librarians
+WHERE device_id IS NOT NULL AND deleted = 0
+ORDER BY full_name ASC
+```
+
+---
+
+### ✔ 2. `getDeviceById(device_id: string)`
+
+Return the librarian using this device.
+
+---
+
+### ✔ 3. `unbindDevice(id: number)`
+
+Same as unbinding a librarian → but wrapped logically.
+
+This should internally call existing `unbindLibrarianDevice`.
+
+---
+
+### ✔ 4. `rebindDevice(id: number, newDeviceId: string)`
+
+Update:
+
+```sql
+UPDATE librarians SET device_id = ? WHERE id = ?
+```
+
+Then commit:
+
+```json
+{
+  "action": "rebind_device",
+  "table": "librarians",
+  "payload": { "id", "device_id": newDeviceId }
+}
+```
+
+---
+
+### ✔ 5. Optional: `getLastSyncForDevice(device_id)`
+
+We can read from:
+
+* meta table (last_pulled_commit)
+* or sync_log table
+
+This is optional for Phase 1.
+
+--- 
+
+
+---
+---
+
+
+# 🔵 **PHASE 1.15.4.7 — Sync Control (Admin Only)**
+
+This is the **central control panel for all synchronization** between local device ↔ cloud.
+
+We will design it cleanly in **3 layers**:
+
+1. **Functional Specification (what features exist)**
+2. **Data + DB Responsibilities**
+3. **UI + Screens + Flow**
+4. **Endpoints (mocked + real)**
+5. **Then Implementation Steps**
+
+---
+
+# ✅ **1. Functional Specification**
+
+## **Admin Sync Control Must Support:**
+
+### ✔ **1. Show sync status**
+
+* Last pull timestamp
+* Last push timestamp
+* Last error (if any)
+* Pending commits count
+* Device ID status (bound/unbound)
+
+---
+
+### ✔ **2. Manual Sync Actions**
+
+Admin can trigger:
+
+#### **A) PUSH COMMITS (local → cloud)**
+
+* Sends all `pending_commits`
+* Updates server
+* Marks commits as synced
+* Updates `sync_log`
+* Requires online
+* If `ONLINE_MODE = false` → simulate immediate success
+
+#### **B) PULL SNAPSHOT (cloud → local)**
+
+* Fetch snapshot from `/sync/snapshot`
+* Apply to DB (books, users, librarians, transactions)
+* Replace or merge
+* Update `meta.last_pulled_commit`
+* Requires online
+* Mock mode allowed
+
+#### **C) FULL SYNC (Push + Pull)**
+
+* Step 1: Push pending
+* Step 2: Pull snapshot
+* Step 3: Show result
+* This is the main recommended button
+* With spinner + status feedback
+
+---
+
+### ✔ **3. Sync Logs**
+
+Show historical logs from `sync_log` table:
+
+* Timestamp
+* Action (`push`, `pull`, `full_sync`)
+* Status (`success`, `failed`)
+* Message (details)
+
+---
+
+### ✔ **4. Edge Cases & Rules**
+
+* If **no device_id**, DO NOT ALLOW sync
+* If **pending_commits > 0**, push button becomes **primary**
+* If **offline**, all sync buttons disabled unless mock mode
+* Sync failures must be logged with details
+
+---
+
+# ✅ **2. Data Layer Requirements**
+
+### Tables used:
+
+### 1️⃣ `pending_commits`
+
+* Contains unsynced local operations
+* Sends them in batch to cloud
+* After success → set `synced = 1`
+
+### 2️⃣ `sync_log`
+
+Stores entries:
+
+```
+{ id, device_id, status, details, timestamp }
+```
+
+### 3️⃣ `meta`
+
+Used fields:
+
+* `last_pulled_commit`
+* `device_id`
+
+---
+
+# DB Queries Needed (New or Existing)
+
+### ✔ Get pending commits count
+
+### ✔ Mark commits as synced
+
+### ✔ Insert log
+
+### ✔ Fetch logs
+
+### ✔ Get last sync timestamps
+
+We already have part of this, but Sync Control will finalize them.
+
+---
+
+# 🟦 **3. UI Screens + Flow**
+
+The UI for `/admin/sync/index.tsx` will have four sections:
+
+---
+
+## **A) Sync Summary Section**
+
+```
+Device ID: XXXXXXX
+Pending Commits: 12
+Last Push: 2025-01-xx
+Last Pull: 2025-01-xx
+Last Error: “network unreachable”
+```
+
+UI style: Blue clean card.
+
+---
+
+## **B) Actions Section**
+
+Buttons:
+
+### 1) **Push Pending Commits**
+
+If pending > 0 → Highlight (blue).
+
+### 2) **Pull Latest Snapshot**
+
+Always available if online.
+
+### 3) **Full Sync (Push + Pull)**
+
+Primary button (thicker border or darker blue).
+
+### 4) **Mock Mode Badge**
+
+A small badge:
+
+```
+Mock Mode: ON
+```
+
+if `ONLINE_MODE = false`.
+
+---
+
+## **C) Sync Logs (Scrollable List)**
+
+Log item:
+
+```
+[2025-01-12 10:21] ✔ Push | success
+Details: 18 commits synced
+```
+
+---
+
+## **D) Warnings**
+
+If:
+
+* device not bound → show red banner
+* app not initialized → show yellow banner
+* offline (real-mode) → show grey disabled overlay
+
+---
+
+# 🟦 **4. Cloud API (Mock + Real)**
+
+### Real endpoints:
+
+```
+POST /sync/push
+POST /sync/pull
+GET  /sync/logs
+```
+
+Mock responses:
+
+* Always success, fixed delay.
+* Snapshot returns small dummy dataset.
+* Push returns random server commit id.
+
+We will wrap everything in:
+
+```ts
+if (!ONLINE_MODE) return mockResponse
+```
+
+This pattern is consistent with earlier phases.
+
+---
+
+# 🟦 **5. Implementation Steps**
+
+We will implement in order:
+
+---
+
+## **STEP 1 — DB Layer /queries/sync.ts**
+
+Includes:
+
+✔ getPendingCommitsCount
+✔ getLastPush
+✔ getLastPull
+✔ insertSyncLog
+✔ markCommitsSynced
+✔ persist snapshot metadata
+
+---
+
+## **STEP 2 — Sync Engine (`lib/syncEngine.ts`)**
+
+Functions:
+
+```
+pushPendingCommits()
+pullSnapshot()
+fullSync()
+```
+
+Each returns structured:
+
+```ts
+{ ok: boolean; message: string }
+```
+
+---
+
+## **STEP 3 — UI `/app/admin/sync/index.tsx`**
+
+Includes:
+
+* summary card
+* buttons
+* logs list
+* loading spinners
+* blocking UI
+* error toast
+
+---
+
+## **STEP 4 — Wire Admin Shell**
+
+Add “Sync Control” button:
+
+```
+router.push("/admin/sync")
+```
+
+---
+
+## **STEP 5 — Testing + Mock Mode**
+
+Use:
+
+```
+ONLINE_MODE = false
+```
+
+for local device testing offline.
+
+---
+ 
+
+
+---
+---
+
+
+Perfect — let's proceed with **PHASE 1.15.4.8 — Commit Logs**.
+
+This is an important admin feature because it gives transparency into all offline changes that will sync or already synced.
+
+Below is the full structured implementation plan.
+
+---
+
+# ✅ **PHASE 1.15.4.8 — Commit Logs**
+
+## **What Commit Logs screen must show**
+
+We want a screen under:
+
+```
+/admin/commits
+```
+
+It should display:
+
+### **1. All pending commits (not yet synced)**
+
+* action
+* table affected
+* timestamp
+* payload (short preview)
+* status (Pending)
+
+### **2. All synced commits**
+
+* action
+* table
+* timestamp
+* payload
+* status (Synced)
+
+### **3. Search / filtering**
+
+(optional for Phase 1, add in Phase 2)
+
+* Filter by table (`books`, `users`, `transactions`, `librarians`, `devices`)
+* Filter by commit type (`insert`, `update`, `delete`, etc.)
+* Filter by status (`pending`, `synced`)
+
+### **4. View full payload**
+
+* click an item → modal with full JSON
+
+---
+
+# 🧱 **Step 1 — Database Layer (Already Partially Implemented)**
+
+We already created **pending_commits**, but now we need:
+
+### **A) Type definition**
+
+### **B) Queries**
+
+### **C) History table (optional)**
+
+Server-side or local copy.
+
+For Phase 1 (offline-first), we only need:
+
+* View `pending_commits`
+* View `pending_commits.synced = 1` after sync
+
+No separate table required yet.
+
+---
+
+# 🧱 **Step 2 — DB Queries Implementation**
+
+### **Create file: `/db/queries/commits.ts`**
+
+It must include:
+
+---
+
+## ✔ 2.1 — Get all pending commits
+
+```ts
+export async function getPendingCommits(): Promise<PendingCommit[]> {
+  return await getAllAsync<PendingCommit>(
+    `SELECT * FROM pending_commits WHERE synced = 0 ORDER BY timestamp DESC`
+  );
+}
+```
+
+---
+
+## ✔ 2.2 — Get all synced commits
+
+```ts
+export async function getSyncedCommits(): Promise<PendingCommit[]> {
+  return await getAllAsync<PendingCommit>(
+    `SELECT * FROM pending_commits WHERE synced = 1 ORDER BY timestamp DESC`
+  );
+}
+```
+
+---
+
+## ✔ 2.3 — Mark commit as synced
+
+(Used by sync engine)
+
+```ts
+export async function markCommitAsSynced(id: number) {
+  await runAsync(
+    `UPDATE pending_commits SET synced = 1 WHERE id = ?`,
+    [id]
+  );
+}
+```
+
+---
+
+## ✔ 2.4 — Delete commit (Phase 2 feature)
+
+Not used for now but useful later.
+
+```ts
+export async function deleteCommit(id: number) {
+  await runAsync(`DELETE FROM pending_commits WHERE id = ?`, [id]);
+}
+```
+
+---
+
+## ✔ 2.5 — Type Definition
+
+```ts
+export interface PendingCommit {
+  id: number;
+  action: string;
+  table_name: string;
+  payload: string;
+  timestamp: number;
+  synced: number;
+}
+```
+
+---
+
+# 🧱 **Step 3 — Commit Logs UI Plan**
+
+Directory:
+
+```
+app/admin/commits/index.tsx
+```
+
+Screen includes:
+
+---
+
+## **🟦 A) Top Section — Quick Stats**
+
+```
+Pending: 12
+Synced: 87
+Last synced: 2 hours ago
+```
+
+---
+
+## **🟩 B) Tabs**
+
+* **Pending Commits**
+* **Synced Commits**
+
+Using:
+
+```tsx
+const [tab, setTab] = useState<"pending" | "synced">("pending");
+```
+
+---
+
+## **🟨 C) List Component**
+
+Each commit card includes:
+
+* Action: `insert`, `update`, `borrow`, `return`, etc.
+* Table: e.g., `transactions`
+* Time: “3 minutes ago”
+* Payload snippet:
+
+  ```
+  { "book_code": "BC-123" ... }
+  ```
+* Status badge (Pending / Synced)
+
+---
+
+## **🟧 D) View Full Payload Modal**
+
+When clicking:
+
+```
+View Details
+```
+
+Opens modal with pretty-printed JSON.
+
+---
+
+# 🧱 **Step 4 — Wiring with Sync Engine**
+
+### ⦿ Sync Engine should call:
+
+```ts
+await markCommitAsSynced(commit.id);
+```
+
+After successful push.
+
+### ⦿ UI should listen for:
+
+```
+events.emit("commits-updated");
+```
+
+So the list refreshes automatically.
+
+--- 
+
+--- 
+PHASE 1.15.4.9 — Shifts Module (Full Plan Overview)
+
+The module has 4 sub-phases:
+
+PHASE 1.15.4.9.1 — DB Schema + Queries + Commit Integration
+
+✔ New shifts table
+✔ New shift_attendance table
+✔ Insert/update queries
+✔ Attendance events (clock-in/out)
+✔ Commit integration for sync
+
+PHASE 1.15.4.9.2 — Admin UI: Shift Assignment
+
+✔ Create weekly/daily shift schedules
+✔ Assign librarian to time slots
+✔ Edit & delete shifts
+✔ View upcoming shifts
+✔ All styled like the admin panel
+
+PHASE 1.15.4.9.3 — Librarian UI: My Shifts
+
+✔ Display “Today’s Shift”
+✔ Show countdown to shift start
+✔ Highlight current shift
+✔ If user is in shift window → show CLOCK-IN button
+✔ If user clocked in → show CLOCK-OUT button
+✔ Sync attendance events to commits
+
+PHASE 1.15.4.9.4 — Attendance Overview (Admin)
+
+✔ View attendance logs
+✔ Filter by librarian or date
+✔ See who was late / on time / missing
+✔ Export-ready data (used later in Reports phase)
+
+---
+---
+
 
 # 5 — Server API endpoints (sketch; server must exist)
 
