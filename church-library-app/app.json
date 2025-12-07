@@ -3,6 +3,7 @@
     "name": "church-library-app",
     "slug": "church-library-app",
     "version": "1.0.0",
+    "jsEngine": "hermes",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "churchlibraryapp",
@@ -29,7 +30,8 @@
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.CAMERA"
       ],
-      "package": "com.anonymous.churchlibraryapp"
+      "package": "com.anonymous.churchlibraryapp",
+      "jsEngine": "hermes"
     },
     "web": {
       "output": "static",
