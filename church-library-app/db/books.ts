@@ -1,5 +1,7 @@
+// church-library-app/db/books.ts
 import { db } from './sqlite'; 
 import { randomUUID } from "expo-crypto";
+import { addCommit } from './commits';
 
 
 type BookInput = {
@@ -30,6 +32,16 @@ export const addBook = async (book: BookInput) => {
       'pending',
     ]
   );
+
+  await addCommit("insert", "books", {
+    book_code,
+    title: book.title,
+    author: book.author,
+    category: book.category,
+    copies: book.copies ?? 1,
+    created_at: now
+  });
+
 
   return book_code;
 };
@@ -64,6 +76,8 @@ export const markBooksSynced = async (codes: string[]) => {
     `UPDATE books SET sync_status = 'synced' WHERE book_code IN (${placeholders})`,
     codes
   );
+
+  
 };
 
 export async function getBookByCode(code: string) {

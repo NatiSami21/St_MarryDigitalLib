@@ -12,7 +12,8 @@ import { useRouter } from "expo-router";
 import { getLibrarianByUsername } from "../../db/queries/librarians";
 import { verifyPinHash } from "../../lib/authUtils";
 import { saveSession } from "../../lib/session";
-import { getMetaValue } from "../../db/queries/meta";
+import { getMetaValue } from "../../db/queries/meta"; 
+
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -53,8 +54,12 @@ export default function LoginScreen() {
       }
 
       // Verify PIN
-      const isValid = await verifyPinHash(pin.trim(), user.pin_salt, user.pin_hash);
-
+      const isValid = await verifyPinHash(
+        pin.trim(),
+        user.pin_salt ?? "",
+        user.pin_hash ?? ""
+      );
+      
       if (!isValid) {
         Alert.alert("Invalid PIN", "Incorrect PIN.");
         setLoading(false);
@@ -66,11 +71,12 @@ export default function LoginScreen() {
         username: user.username,
         role: user.role,
         loggedInAt: Date.now(),
+        device_id: deviceId,
       });
 
       // Redirect user
       if (user.role === "admin") {
-        router.replace("./admin");
+        router.replace("/admin");
       } else {
         router.replace("/");
       }

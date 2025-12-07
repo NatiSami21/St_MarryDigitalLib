@@ -1,4 +1,5 @@
 import { db } from "./sqlite";
+import { addCommit } from "./commits";
 
 /* -------------------------------------------------------
  * TYPES
@@ -159,4 +160,11 @@ export async function updateUser(
       fayda_id,
     ]
   );
+
+  await addCommit("update", "users", {
+    fayda_id,
+    ...updates
+  });
+
+
 }

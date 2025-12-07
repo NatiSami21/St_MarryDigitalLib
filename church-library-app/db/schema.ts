@@ -34,15 +34,13 @@ export const createTransactionsTable = `
   CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tx_id TEXT UNIQUE,
-    book_code TEXT,
-    fayda_id TEXT,
-    type TEXT CHECK(type IN ('borrow','return')),
-    timestamp TEXT,
+    book_code TEXT NOT NULL,
+    fayda_id TEXT NOT NULL,
+    borrowed_at TEXT NOT NULL,
     returned_at TEXT,
-    borrowed_at TEXT,
-    status TEXT DEFAULT 'borrowed',
     device_id TEXT,
     sync_status TEXT DEFAULT 'pending',
+
     FOREIGN KEY (book_code) REFERENCES books(book_code),
     FOREIGN KEY (fayda_id) REFERENCES users(fayda_id)
   );

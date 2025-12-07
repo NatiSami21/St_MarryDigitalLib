@@ -82,7 +82,7 @@ export default function AdminShiftsScreen() {
 
       <View style={{ flexDirection: "row", marginTop: 12 }}>
         <TouchableOpacity
-          onPress={() => router.push(`./admin/shifts/edit/${shift.id}`)}
+          onPress={() => router.push(`/admin/shifts/edit/${shift.id}`)}
           style={{
             backgroundColor: "#1e40af",
             paddingVertical: 8,
@@ -147,7 +147,7 @@ export default function AdminShiftsScreen() {
 
       {/* Add Shift Button */}
       <TouchableOpacity
-        onPress={() => router.push("./admin/shifts/create")}
+        onPress={() => router.push("/admin/shifts/create")}
         style={{
           backgroundColor: "#1e3a8a",
           padding: 14,

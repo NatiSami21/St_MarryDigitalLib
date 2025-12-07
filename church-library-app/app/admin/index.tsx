@@ -18,14 +18,14 @@ export default function AdminDashboard() {
       try {
         const session = await getSession();
         if (!session) {
-          router.replace("./auth/login");
+          router.replace("/auth/login");
           return;
         }
 
         const user = await getLibrarianByUsername(session.username);
         if (!user || user.role !== "admin") {
           await clearSession();
-          router.replace("./auth/login");
+          router.replace("/auth/login");
           return;
         }
 
@@ -33,7 +33,7 @@ export default function AdminDashboard() {
         const deviceId = await getMetaValue("device_id");
         if (user.device_id && user.device_id !== deviceId) {
           await clearSession();
-          router.replace("./auth/login");
+          router.replace("/auth/login");
           return;
         }
 
@@ -100,31 +100,31 @@ export default function AdminDashboard() {
       <MenuButton
         title="Manage Librarians"
         subtitle="Add, delete, update, reset PIN, assign device"
-        onPress={() => router.push("./admin/librarians/list")}
+        onPress={() => router.push("/admin/librarians/list")}
       />
 
       <MenuButton
         title="Device Management"
         subtitle="View bound devices, unbind, secure device access"
-        onPress={() => router.push("./admin/devices")}
+        onPress={() => router.push("/admin/devices")}
       />
 
       <MenuButton
         title="Sync & Cloud Control"
         subtitle="Push pending commits, pull latest data, troubleshoot sync"
-        onPress={() => router.push("./admin/sync")}
+        onPress={() => router.push("/admin/sync")}
       />
 
       <MenuButton
         title="Commit Logs"
         subtitle="Review all operations, revert unsafe commits, audit library activity"
-        onPress={() => router.push("./admin/commits")}
+        onPress={() => router.push("/admin/commits")}
       />
 
       <MenuButton
         title="Shift Management"
         subtitle="Define shifts, link borrows/returns to shifts, view shift productivity"
-        onPress={() => router.push("./admin/shifts")}
+        onPress={() => router.push("/admin/shifts")}
       />
 
       <MenuButton
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
         subtitle="Log out of admin session"
         onPress={async () => {
           await clearSession();
-          router.replace("./auth/login");
+          router.replace("/auth/login");
         }}
       />
 
@@ -152,9 +152,4 @@ export default function AdminDashboard() {
   );
 }
 
- 
-
-//PHASE 1.15.4.6 — Device Management
-//✔ View all device bindings
-//✔ Unbind a device
-//✔ Audit device activity
+  

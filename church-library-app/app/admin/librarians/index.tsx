@@ -121,7 +121,7 @@ export default function ManageLibrarians() {
       </Text>
 
       <TouchableOpacity
-        onPress={() => router.push("./admin/librarians/add")}
+        onPress={() => router.push("/admin/librarians/add")}
         style={{
           backgroundColor: "#1e3a8a",
           padding: 14,

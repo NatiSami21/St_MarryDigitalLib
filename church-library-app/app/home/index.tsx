@@ -80,7 +80,7 @@ export default function HomeDashboard() {
       {/* Admin Panel Button */}
       {isAdmin && (
         <TouchableOpacity
-          onPress={() => router.push("./admin")}
+          onPress={() => router.push("/admin")}
           style={{
             backgroundColor: "#1e3a8a",
             padding: 14,

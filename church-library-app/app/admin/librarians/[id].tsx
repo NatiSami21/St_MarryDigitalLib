@@ -38,14 +38,14 @@ export default function LibrarianDetailsScreen() {
     try {
       if (!id) {
         Alert.alert("Error", "Missing librarian id.");
-        router.replace("./admin/librarians");
+        router.replace("/admin/librarians");
         return;
       }
 
       const row = await getLibrarianById(Number(id));
       if (!row) {
         Alert.alert("Not found", "Librarian not found.");
-        router.replace("./admin/librarians");
+        router.replace("/admin/librarians");
         return;
       }
       setLibrarian(row);
@@ -149,7 +149,7 @@ export default function LibrarianDetailsScreen() {
               setProcessing(true);
               await softDeleteLibrarian(librarian.id);
               Alert.alert("Deleted", "Librarian has been removed.", [
-                { text: "OK", onPress: () => router.replace("./admin/librarians") },
+                { text: "OK", onPress: () => router.replace("/admin/librarians") },
               ]);
             } catch (err) {
               console.log("Delete error:", err);

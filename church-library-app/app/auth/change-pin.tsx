@@ -1,9 +1,8 @@
-// app/auth/change-pin.tsx
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { runAsync } from "../../db/sqlite";
-import { generateSalt, hashPin } from "../../lib/authUtils";
+import { getOneAsync, runAsync } from "../../db/sqlite";
+import { generateSalt, hashPin, verifyPinHash } from "../../lib/authUtils";
 
 export default function ChangePinScreen() {
   const router = useRouter();
@@ -25,10 +24,29 @@ export default function ChangePinScreen() {
       return;
     }
 
+    const record = await getOneAsync<{ pin_salt: string; pin_hash: string }>(
+      `SELECT pin_salt, pin_hash FROM librarians WHERE username = ?`,
+      [usernameParam]
+    );
+
+    if (!record) {
+      Alert.alert("Error", "User not found.");
+      return;
+    }
+
+    const isValidOld = await verifyPinHash(
+      oldPin.trim(),
+      record.pin_salt ?? "",
+      record.pin_hash ?? ""
+    );
+
+    if (!isValidOld) {
+      Alert.alert("Invalid PIN", "Old/temporary PIN is incorrect.");
+      return;
+    }
+
     setLoading(true);
     try {
-      // For activation flow the server already validated the temp PIN.
-      // We will simply create new salt/hash and store locally for usernameParam.
       const salt = generateSalt();
       const hash = await hashPin(newPin, salt);
 
@@ -37,7 +55,9 @@ export default function ChangePinScreen() {
         [salt, hash, new Date().toISOString(), usernameParam]
       );
 
-      Alert.alert("Success", "PIN changed successfully.", [{ text: "OK", onPress: () => router.replace("/") }]);
+      Alert.alert("Success", "PIN changed successfully.", [
+        { text: "OK", onPress: () => router.replace("/") }
+      ]);
     } catch (err: any) {
       console.error("change-pin error:", err);
       Alert.alert("Error", "Failed to set new PIN.");
@@ -46,10 +66,13 @@ export default function ChangePinScreen() {
     }
   };
 
+  // — UI same as before —
   return (
     <View style={{ flex: 1, padding: 20, justifyContent: "center", backgroundColor: "#f8fafc" }}>
       <View style={{ backgroundColor: "white", padding: 18, borderRadius: 12 }}>
-        <Text style={{ fontSize: 20, fontWeight: "800", color: "#1e3a8a", marginBottom: 8 }}>Set a New PIN</Text>
+        <Text style={{ fontSize: 20, fontWeight: "800", color: "#1e3a8a", marginBottom: 8 }}>
+          Set a New PIN
+        </Text>
         <Text style={{ color: "#475569", marginBottom: 12 }}>
           For user <Text style={{ fontWeight: "700" }}>{usernameParam}</Text>. Please set a new 4-digit PIN now.
         </Text>
@@ -81,7 +104,10 @@ export default function ChangePinScreen() {
           style={{ borderWidth: 1, borderColor: "#e6eef9", padding: 12, borderRadius: 8, marginBottom: 14 }}
         />
 
-        <TouchableOpacity onPress={handleChange} style={{ backgroundColor: "#1e40af", padding: 12, borderRadius: 8, alignItems: "center" }}>
+        <TouchableOpacity
+          onPress={handleChange}
+          style={{ backgroundColor: "#1e40af", padding: 12, borderRadius: 8, alignItems: "center" }}
+        >
           {loading ? <ActivityIndicator color="white" /> : <Text style={{ color: "white", fontWeight: "700" }}>Set New PIN</Text>}
         </TouchableOpacity>
       </View>

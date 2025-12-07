@@ -8,6 +8,7 @@ export interface Librarian {
   username: string;
   full_name: string;
   role: "admin" | "librarian";
+  pin_salt: string;  
   device_id: string | null;
   salt: string | null;
   pin_hash: string | null;

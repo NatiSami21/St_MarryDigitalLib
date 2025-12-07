@@ -1,4 +1,5 @@
 // app/auth/login-cloud.tsx
+import { saveSession } from "../../lib/session";
 import React, { useState } from "react";
 import {
   View,
@@ -55,12 +56,19 @@ export default function LoginCloud() {
 
       // If server requires PIN change, route to change-pin screen and pass username
       if (require_pin_change) {
-        router.replace({ pathname: "./auth/change-pin", params: { username, next: role === "admin" ? "/admin" : "/" } });
+        router.replace({ pathname: "/auth/change-pin", params: { username, next: role === "admin" ? "/admin" : "/" } });
         return;
       }
 
+      await saveSession({
+        username,
+        role,
+        loggedInAt: Date.now(),
+        device_id
+      });
+
       // otherwise, create a local session and route to appropriate dashboard
-      router.replace(role === "admin" ? "./admin" : "/");
+      router.replace(role === "admin" ? "/admin" : "/");
     } catch (err: any) {
       console.log("Activation error:", err);
       Alert.alert("Error", err.message || "Activation failed");

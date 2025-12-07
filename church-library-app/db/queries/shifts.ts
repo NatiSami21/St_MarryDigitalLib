@@ -30,6 +30,15 @@ export async function getShiftsByDate(date: string): Promise<Shift[]> {
   );
 }
 
+export async function getShiftById(id: number): Promise<Shift | null> {
+  const rows = await getAllAsync<Shift>(
+    `SELECT * FROM shifts WHERE id = ? AND deleted = 0 LIMIT 1`,
+    [id]
+  );
+  return rows.length > 0 ? rows[0] : null;
+}
+
+
 export async function getUpcomingShiftsForUser(username: string): Promise<Shift[]> {
   return await getAllAsync<Shift>(
     `SELECT * FROM shifts 

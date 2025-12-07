@@ -19,7 +19,7 @@ export default function BootstrapScreen() {
         </Text>
 
         <TouchableOpacity
-          onPress={() => router.push("./auth/login-cloud")}
+          onPress={() => router.push("/auth/login-cloud")}
           style={{
             backgroundColor: "#1e40af",
             paddingVertical: 14,

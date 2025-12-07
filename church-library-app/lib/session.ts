@@ -4,7 +4,8 @@ import * as SecureStore from "expo-secure-store";
 export type SessionPayload = {
   username: string;
   role: "admin" | "librarian";
-  loggedInAt: number; // timestamp
+  loggedInAt: number; // 
+  device_id: string; 
 };
 
 export async function saveSession(session: SessionPayload): Promise<void> {
