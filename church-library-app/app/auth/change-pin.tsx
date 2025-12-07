@@ -13,6 +13,8 @@ export default function ChangePinScreen() {
   const [newPin, setNewPin] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const nextRoute = (params.next as string) || "/";
+
 
   const handleChange = async () => {
     if (!newPin || newPin.length < 4) {
@@ -56,7 +58,7 @@ export default function ChangePinScreen() {
       );
 
       Alert.alert("Success", "PIN changed successfully.", [
-        { text: "OK", onPress: () => router.replace("/") }
+        { text: "OK", onPress: () => router.replace(nextRoute as any) }
       ]);
     } catch (err: any) {
       console.error("change-pin error:", err);

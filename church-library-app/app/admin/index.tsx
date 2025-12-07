@@ -100,7 +100,7 @@ export default function AdminDashboard() {
       <MenuButton
         title="Manage Librarians"
         subtitle="Add, delete, update, reset PIN, assign device"
-        onPress={() => router.push("/admin/librarians/list")}
+        onPress={() => router.push("/admin/librarians")}
       />
 
       <MenuButton

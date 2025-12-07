@@ -3,7 +3,7 @@ import { View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 
 import { getSession, clearSession } from "../lib/session";
-import { getLibrarianByUsername } from "../db/queries/librarians";
+import { getLibrarianByUsername, getLibrarianCount } from "../db/queries/librarians";
 import { getMetaValue } from "../db/queries/meta";
 
 export default function Index() {
@@ -14,15 +14,27 @@ export default function Index() {
     const bootstrap = async () => {
       const session = await getSession();
 
-      // NO SESSION → go to offline login
+      // ------------------------------------------
+      // FIRST RUN CHECK
+      // ------------------------------------------
       if (!session) {
-        router.replace("/auth/login");
+        const count = await getLibrarianCount();
+
+        if (count === 0) {
+          // No users → device is fresh → activation required
+          router.replace("/auth/bootstrap");
+        } else {
+          // Users exist → local login allowed
+          router.replace("/auth/login");
+        }
         return;
       }
 
+      // ------------------------------------------
+      // SESSION VALIDATION
+      // ------------------------------------------
       const user = await getLibrarianByUsername(session.username);
 
-      // USER NO LONGER EXISTS LOCALLY → session invalid
       if (!user || user.deleted === 1) {
         await clearSession();
         router.replace("/auth/login");
@@ -37,7 +49,7 @@ export default function Index() {
         return;
       }
 
-      // SESSION EXPIRES AFTER 12 HOURS
+      // SESSION TIMEOUT CHECK (12 hours)
       const age = Date.now() - (session.loggedInAt ?? 0);
       const maxAge = 12 * 60 * 60 * 1000;
 
@@ -47,12 +59,10 @@ export default function Index() {
         return;
       }
 
-      // ROLE-BASED ROUTING
-      if (user.role === "admin") {
-        router.replace("/home"); // ADMIN ALSO SEES SAME HOME BUT WITH ADMIN BUTTON
-      } else {
-        router.replace("/home");
-      }
+      // ------------------------------------------
+      // ROLE ROUTING
+      // ------------------------------------------
+      router.replace("/home"); // both admin and librarian go here
     };
 
     bootstrap().finally(() => setLoading(false));

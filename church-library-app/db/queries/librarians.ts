@@ -74,6 +74,14 @@ export async function softDeleteLibrarian(id: number) {
   await addCommit("soft_delete", "librarians", { id });
 }
 
+export async function getLibrarianCount() {
+  const row = await getOneAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM librarians"
+  );
+  return row?.count ?? 0;
+}
+
+
 export async function unbindLibrarianDevice(id: number) {
   await db.runAsync(
     `UPDATE librarians SET device_id = NULL WHERE id = ?`,
