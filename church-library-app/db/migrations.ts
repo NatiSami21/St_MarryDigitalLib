@@ -6,12 +6,13 @@ export async function runMigrations() {
 
   try {
     // -----------------------------
-    // 1. LIBRARIANS TABLE
+    // 1. LIBRARIANS TABLE (CREATE IF NOT EXISTS)
     // -----------------------------
     db.execSync(`
       CREATE TABLE IF NOT EXISTS librarians (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
+        full_name TEXT,
         pin_salt TEXT,
         pin_hash TEXT,
         role TEXT CHECK(role IN ('admin','librarian')) DEFAULT 'librarian',
@@ -21,6 +22,13 @@ export async function runMigrations() {
         updated_at TEXT
       );
     `);
+
+    // ONE-TIME SAFE COLUMN ADDITIONS
+    try { db.execSync(`ALTER TABLE librarians ADD COLUMN full_name TEXT;`); } catch {}
+    try { db.execSync(`ALTER TABLE librarians ADD COLUMN created_at TEXT;`); } catch {}
+    try { db.execSync(`ALTER TABLE librarians ADD COLUMN updated_at TEXT;`); } catch {}
+    try { db.execSync(`ALTER TABLE librarians ADD COLUMN device_id TEXT;`); } catch {}
+    try { db.execSync(`ALTER TABLE librarians ADD COLUMN deleted INTEGER DEFAULT 0;`); } catch {}
 
     // -----------------------------
     // 2. COMMITS TABLE
@@ -38,8 +46,10 @@ export async function runMigrations() {
       );
     `);
 
+    // NEVER alter timestamp again!
+
     // -----------------------------
-    // 3. SESSIONS TABLE (optional)
+    // 3. SESSIONS TABLE
     // -----------------------------
     db.execSync(`
       CREATE TABLE IF NOT EXISTS sessions (
@@ -54,15 +64,9 @@ export async function runMigrations() {
     // -----------------------------
     // 4. TRANSACTIONS MIGRATIONS
     // -----------------------------
-    try {
-      db.execSync(`ALTER TABLE transactions ADD COLUMN borrowed_at TEXT;`);
-    } catch {}
+    try { db.execSync(`ALTER TABLE transactions ADD COLUMN borrowed_at TEXT;`); } catch {}
+    try { db.execSync(`ALTER TABLE transactions ADD COLUMN returned_at TEXT;`); } catch {}
 
-    try {
-      db.execSync(`ALTER TABLE transactions ADD COLUMN returned_at TEXT;`);
-    } catch {}
-
-    // Backfill borrowed_at if empty
     db.execSync(`
       UPDATE transactions
       SET borrowed_at = timestamp
@@ -78,13 +82,8 @@ export async function runMigrations() {
     // -----------------------------
     // 5. USERS TABLE MIGRATIONS
     // -----------------------------
-    try {
-      db.execSync(`ALTER TABLE users ADD COLUMN gender TEXT;`);
-    } catch {}
-
-    try {
-      db.execSync(`ALTER TABLE users ADD COLUMN address TEXT;`);
-    } catch {}
+    try { db.execSync(`ALTER TABLE users ADD COLUMN gender TEXT;`); } catch {}
+    try { db.execSync(`ALTER TABLE users ADD COLUMN address TEXT;`); } catch {}
 
     console.log("✅ Database migrations finished.");
   } catch (err) {

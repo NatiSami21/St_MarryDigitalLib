@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { initDb } from "../db/sqlite";
 import { useState } from "react";
 
-//import { runMigrations } from "../db/migrations";
+import { runMigrations } from "../db/migrations";
  
 export default function Layout() {
   const [ready, setReady] = useState(false);
@@ -12,7 +12,7 @@ export default function Layout() {
     const initialize = async () => {
       await initDb();
       setReady(true);
-      //runMigrations();  // ← enable once
+      runMigrations();  // ← enable once
     };
     initialize();
   }, []);

@@ -65,9 +65,12 @@ export const createLibrariansTable = `
     device_id TEXT NULL,
     pin_salt TEXT,
     pin_hash TEXT,
+    created_at TEXT,
+    updated_at TEXT,
     deleted INTEGER DEFAULT 0
   );
 `;
+
 
 export const createMetaTable = `
   CREATE TABLE IF NOT EXISTS meta (

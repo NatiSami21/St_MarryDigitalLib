@@ -68,10 +68,28 @@ function mockSnapshot() {
       { fayda_id: "user-1", name: "Test User", phone: "0912345678", photo_uri: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" },
     ],
     librarians: [
-      // default admin
-      { username: "DiguwaSoft", role: "admin", pin_salt: "srv-salt", pin_hash: "srv-hash", device_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted: 0 },
-      // demo librarian
-      { username: "lib1", role: "librarian", pin_salt: "srv-salt", pin_hash: "srv-hash", device_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted: 0 },
+      { 
+        username: "DiguwaSoft",
+        full_name: "Diguwa Soft Admin",
+        role: "admin",
+        pin_salt: "srv-salt",
+        pin_hash: "srv-hash",
+        device_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted: 0
+      },
+      { 
+        username: "lib1",
+        full_name: "Demo Librarian",
+        role: "librarian",
+        pin_salt: "srv-salt",
+        pin_hash: "srv-hash",
+        device_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted: 0
+      }
     ],
     commits: [],
   };
