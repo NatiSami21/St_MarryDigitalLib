@@ -162,18 +162,7 @@ Admin flow similar but server accepts Admin logins during bootstrap:
 * Authoritative server state wins for conflicts during push. Client should show conflict errors and allow admin to reconcile.
 
 ---
-
-# Device binding & change-device flow
-
-* On first cloud activation, server stores `device_id` for that librarian.
-* Subsequent cloud activations require same `device_id` or server will reject.
-* To move a librarian to a new device:
-
-  1. Admin uses admin dashboard `Unbind device` action for that librarian (creates a commit).
-  2. Librarian activates new device with their username + pin; server accepts (device_id becomes new device).
-  3. Optionally, admin reviews previous device commits.
-
----
+ 
 
 # UI flows summary (screens & transitions)
 
@@ -264,41 +253,400 @@ Admin flow similar but server accepts Admin logins during bootstrap:
 * Attempt to bootstrap without network fails gracefully.
 
 ---
+ Absolutely — I will now give you a **full, end-to-end, crystal-clear explanation** of the **ENTIRE system flow**, covering every user type, every screen, every database operation, every offline-first behavior, every sync rule, and how all modules interact.
 
-# Implementation checklist (phase-by-phase tasks)
-
-**Phase 1 (complete MVP)**
-
-* ✅ Local DB tables, migrations
-* ✅ Book register + QR + gallery save
-* ✅ User register & photo upload
-* ✅ Borrow/Return local logic + transactions table
-* ✅ Per-user, per-book history screens
-* ✅ Reports CSV export
-
-**Phase 1.15 (Auth & device binding)**
-
-* [ ] Add `librarians` table + pin hashing functions (lib/authUtils.ts)
-* [ ] Add SecureStore wrappers for session tokens
-* [ ] Add `commits` / `audit_log` table and local commit helper
-* [ ] Create `Initial Setup` screen + cloud activate endpoint
-* [ ] Cloud server endpoints (bootstrap, auth/activate, auth/change-pin, sync/push, sync/pull)
-* [ ] Device binding logic on server and client
-* [ ] Admin UI for managing librarians and unbind/reset device
-* [ ] Tests for activation, device binding, revoke flows
-
-**Phase 2 (UX polishing & hardened sync)**
-
-* UI polish with animations & native feel
-* Resolve conflicts, implement revert/undo behavior
-* Add encryption on SQLite if required (sensitive deployments)
+This is the **complete blueprint** of your church library app.
 
 ---
 
-# Final notes / recommendations
+# 📘 **THE COMPLETE APP FLOW — FULL SYSTEM DESIGN (Your Project)**
 
-* **Prefer separate scan screens** for book/user then confirm screen (you already implemented this; it solved params-loop). Keep that pattern — much simpler to reason about and debug.
-* **Pin hashing**: use a strong algorithm (Argon2 if available server-side; PBKDF2 if easier). On client, store salt + derived hash for local verification.
-* **Device id stability**: generate `device_id` using SecureStore-only value (UUID stored in SecureStore) — it should survive app updates but not uninstall. That’s good (uninstall = lost device binding), and admin must unbind to allow reactivation.
-* **Restrict critical server APIs**: only admins allowed to create librarians and unbind device.
-* **Testing**: include an automated test plan covering activation, device-change and revoke flows.
+Below is the full system flow broken into **6 core layers**, each layer referencing real files you built.
+
+---
+
+# 1️⃣ **SYSTEM ENTRY: Activation → Login → Home**
+
+## **A. Activation (first device setup)**
+
+* New device opens app.
+* No session found → redirect automatically to `/auth/login`.
+* If no local librarian exists → `/auth/activate` is shown (admin device only).
+* User enters:
+
+  * username
+  * temporary PIN
+* `postActivate()` (mock server or real server) validates:
+
+  * If username exists in server DB
+  * If PIN matches server temp PIN
+  * If device binding allowed
+
+### **Server response includes:**
+
+* role (admin/librarian)
+* require_pin_change (boolean)
+* last_pulled_commit
+* snapshot = full DB image (books, users, librarians, commits)
+
+### **Client applies snapshot:**
+
+* Clears all local DB tables.
+* Inserts all books, users, librarians.
+* Sets device_id in local meta table.
+* Creates local admin/librarian record with server hash/salt.
+
+### **If `require_pin_change = true`:**
+
+→ Navigate to `/auth/change-pin`
+→ User must set a new PIN
+→ Save new salt/hash locally
+→ Admin is operational
+
+Activation complete.
+
+---
+
+## **B. Login Flow (`/auth/login.tsx`)**
+
+User enters:
+
+* username
+* PIN
+
+Steps:
+
+1. `getLibrarianByUsername()` loads local librarian.
+2. Verify:
+
+   * user exists locally
+   * not deleted
+   * correct device_id binding
+3. `verifyPinHash()` checks:
+
+   * user.pin_salt
+   * user.pin_hash
+4. If OK → save session `saveSession()`
+5. Redirect based on role:
+
+   * admin → `/admin`
+   * librarian → `/home`
+
+### **Session is stored in local meta-like store**
+
+Session expires after **12 hours** and device must match.
+
+---
+
+## **C. Home Screen (`/home/index.tsx`)**
+
+Home loads:
+
+* `getDashboardStats()`
+* librarian role (to show/hide Admin button)
+
+Home shows:
+
+* Total Books
+* Total Users
+* Active Borrows
+* Returned Today
+* Returned This Month
+* Overdue Count
+* Available Copies
+* Quick actions (Borrow, Return, Books, Users...)
+
+Everything is pulled **entirely from SQLite**.
+
+No server interaction.
+
+---
+
+# 2️⃣ **CORE OFFLINE-FIRST LOGIC — The Heart of the System**
+
+### **🔵 The system is *local-first*.**
+
+Every action the librarian does works **without internet**.
+
+### You implemented the **correct offline architecture**:
+
+### **1. All write operations mutate the local SQLite DB**
+
+When librarian:
+
+* adds a book
+* updates book copies
+* registers a user
+* borrows a book
+* returns a book
+* creates attendance
+* clocks in/out
+* updates shift
+
+Everything is written to SQLite immediately.
+
+### **2. Every write also creates a commit**
+
+Example commit:
+
+```
+{
+  action: "borrow",
+  table_name: "transactions",
+  payload: "{...}",
+  timestamp: 17182629933,
+  synced: 0
+}
+```
+
+This goes to:
+`pending_commits` table.
+
+Nothing leaves the device yet.
+
+The device is always operational.
+
+---
+
+# 3️⃣ **BOOK FLOW — Full Lifecycle**
+
+### ⚙ **A. Register Book (`/books/register`)**
+
+* Librarian enters title, author, copies...
+* `addBook()` inserts into SQLite.
+* A **commit** is created:
+
+```
+insert, table: books, payload: {book_code, ...}
+```
+
+* App shows QR
+* User can save QR to gallery
+
+This allows offline cataloging.
+
+---
+
+### 📚 **B. View Books List (`/books/list`)**
+
+* `getAllBooks()` fetches SQLite books
+* Search filters locally
+* Clicking a book → `/books/[code]`
+
+---
+
+### 📦 **C. Book Details (`/books/[code]`)**
+
+Shows:
+
+* title
+* author
+* category
+* copies
+* notes
+* QR
+* Borrow History button
+
+---
+
+### 🧾 **D. Book Inventory (`/books/inventory`)**
+
+Real-time availability using formula:
+
+```
+available = total_copies - borrowed_now
+```
+
+All computed locally.
+
+---
+
+### 🕑 **E. Borrow / Return**
+
+**Borrow:**
+
+1. Scan QR → `/borrow`
+2. Select user
+3. Check if user exists
+4. Check book availability
+5. Create `transaction`
+6. Decrement book.copies
+7. Create commit:
+
+   * borrow
+   * update books
+
+**Return:**
+
+1. Scan QR or select book
+2. Mark returned_at
+3. Increment book.copies
+4. Create commit:
+
+   * return
+   * update books
+
+Both borrow and return work **without internet**.
+
+---
+
+# 4️⃣ **USER MANAGEMENT FLOW**
+
+### 👤 **User Registration**
+
+* Works offline
+* Adds new user to `users` table
+* Commit: insert users
+
+### 🧑‍🤝‍🧑 **User List (`/users/list`)**
+
+* Local SQLite
+* Search locally
+
+### 👤 **User Details (`/users/[id]`)**
+
+* Show active borrows
+* Show history
+* Offline view
+
+User pages are 100% offline.
+
+---
+
+# 5️⃣ **LIBRARIAN / ADMIN FLOW**
+
+### **Admin has special abilities:**
+
+* Manage librarians
+* Unbind devices
+* Reset PINs
+* Sync settings
+* View sync logs
+* Access admin dashboard
+
+### Librarian:
+
+* Cannot manage librarians
+* Cannot sync commits from server manually unless allowed
+* Uses regular home dashboard
+
+---
+
+# 6️⃣ **SYNC ENGINE — The Brain of Offline**
+
+This is the most advanced part.
+
+### 🔺 **When user presses SYNC NOW:**
+
+### STEP 1 → PUSH PENDING COMMITS
+
+Send:
+
+```
+pending_commits WHERE synced = 0
+```
+
+Server receives:
+
+* all writes since last sync
+* in timestamp order
+
+Server then:
+
+* applies them into central DB
+* resolves conflicts
+* marks them with server commit_id
+* responds with success/failure per commit
+
+Client:
+
+* marks synced commits as `synced = 1`
+* optionally deletes them
+
+---
+
+### STEP 2 → PULL SNAPSHOT (IF SERVER REQUESTS)
+
+Server returns:
+
+```
+snapshot: {
+  books: [...],
+  users: [...],
+  librarians: [...],
+  transactions: [...],
+  commits: [...]
+}
+```
+
+Client:
+
+* wipes local DB
+* inserts fresh snapshot
+* re-applies device metadata
+* session stays intact
+
+This ensures all devices have the same DB state.
+
+You built this perfectly.
+
+---
+
+# 7️⃣ **ATTENDANCE & SHIFT MODULE**
+
+### ✔ Shift is created by admin.
+
+Includes:
+
+```json
+start_time
+end_time
+assigned_users
+```
+
+### ✔ When librarian opens app:
+
+Attendance auto-created if shift started.
+
+### Clock-in:
+
+* attendance.clock_in = now
+* commit action: update_attendance
+
+### Clock-out:
+
+* attendance.clock_out = now
+* status becomes "completed"
+* commit created
+
+### Attendance history:
+
+* Fully offline
+* Based on local records
+
+---
+
+# 8️⃣ **DASHBOARD FUNCTIONS**
+
+Dashboard reads:
+
+* COUNT books
+* SUM copies
+* Active borrows (returned_at null)
+* Returned today
+* Returned this month
+* Overdue count (older than 14 days)
+* Total users
+* Available copies
+
+All uses `localtime` so dates sync with device.
+
+This is production-level reporting.
+
+---
+
+# 📌 **SUMMARY — THE FULL SYSTEM FLOW IN ONE SENTENCE**
+
+> A secure offline-first library system where all librarian actions (books, borrow/return, users, attendance, shifts) operate entirely using local SQLite and generate commits; synchronization is manual and sends commits to the server, which returns a full snapshot to ensure consistency across devices; admin users can control devices, librarians, and sync; authentication is device-bound and PIN-based.
+
+--- 
