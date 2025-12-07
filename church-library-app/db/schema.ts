@@ -63,7 +63,7 @@ export const createLibrariansTable = `
     full_name TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('admin','librarian')),
     device_id TEXT NULL,
-    salt TEXT,
+    pin_salt TEXT,
     pin_hash TEXT,
     deleted INTEGER DEFAULT 0
   );
