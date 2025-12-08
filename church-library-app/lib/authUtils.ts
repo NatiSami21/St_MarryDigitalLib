@@ -1,36 +1,40 @@
-// lib/authUtils.ts
 import * as Crypto from "expo-crypto";
 
-// ----------------------------------------------------
-// 1. Generate Salt (16 bytes → base64)
-// ----------------------------------------------------
-export function generateSalt(): string {
-  const random = Crypto.getRandomBytes(16);
-  return Buffer.from(random).toString("base64");
+/**
+ * Generate a secure random salt (returns hex string)
+ */
+export function generateSalt(length = 16): string {
+  const randomBytes = Crypto.getRandomBytes(length);
+  return Array.from(randomBytes)
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join(""); // hex string
 }
 
-// ----------------------------------------------------
-// 2. Hash PIN using SHA-256 + Salt
-//    (Expo compatible, secure enough for offline PIN auth)
-// ----------------------------------------------------
+/**
+ * Hash PIN using SHA-256(salt + ":" + pin)
+ */
 export async function hashPin(pin: string, salt: string): Promise<string> {
-  const input = pin + ":" + salt;
+  const input = `${salt}:${pin}`;
 
   return await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     input,
-    { encoding: Crypto.CryptoEncoding.BASE64 }
+    {
+      encoding: Crypto.CryptoEncoding.HEX,
+    }
   );
 }
 
-// ----------------------------------------------------
-// 3. Verify PIN (constant-time safe comparisons are not necessary for PIN)
-// ----------------------------------------------------
+/**
+ * Verify PIN
+ */
 export async function verifyPinHash(
   pin: string,
   salt: string,
   storedHash: string
 ): Promise<boolean> {
-  const newHash = await hashPin(pin, salt);
-  return newHash === storedHash;
+  if (!salt || !storedHash) return false;
+
+  const computed = await hashPin(pin, salt);
+  return computed === storedHash;
 }

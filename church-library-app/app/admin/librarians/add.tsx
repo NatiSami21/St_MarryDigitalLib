@@ -50,7 +50,7 @@ export default function AddLibrarianScreen() {
         username: username.trim(),
         full_name: fullName.trim(),
         role,
-        salt,
+        pin_salt: salt,
         pin_hash,
       });
 

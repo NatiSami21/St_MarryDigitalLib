@@ -11,7 +11,7 @@ export interface Librarian {
   full_name: string;
   role: "admin" | "librarian";
   device_id: string | null;
-  salt: string | null;
+  pin_salt: string | null;
   pin_hash: string | null;
   deleted: number;
 }
