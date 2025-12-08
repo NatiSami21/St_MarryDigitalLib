@@ -64,20 +64,16 @@ export async function runMigrations() {
     // -----------------------------
     // 4. TRANSACTIONS MIGRATIONS
     // -----------------------------
-    try { db.execSync(`ALTER TABLE transactions ADD COLUMN borrowed_at TEXT;`); } catch {}
-    try { db.execSync(`ALTER TABLE transactions ADD COLUMN returned_at TEXT;`); } catch {}
+    // 4. TRANSACTIONS MIGRATIONS (final)
+    try {
+      db.execSync(`ALTER TABLE transactions ADD COLUMN borrowed_at TEXT;`);
+    } catch {}
 
-    db.execSync(`
-      UPDATE transactions
-      SET borrowed_at = timestamp
-      WHERE borrowed_at IS NULL AND type = 'borrow';
-    `);
+    try {
+      db.execSync(`ALTER TABLE transactions ADD COLUMN returned_at TEXT;`);
+    } catch {}
 
-    db.execSync(`
-      UPDATE transactions
-      SET returned_at = timestamp
-      WHERE returned_at IS NULL AND type = 'return';
-    `);
+    // No backfill needed — new schema controls values
 
     // -----------------------------
     // 5. USERS TABLE MIGRATIONS

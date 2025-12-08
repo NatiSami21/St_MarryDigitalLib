@@ -12,7 +12,7 @@ export default function Layout() {
     const initialize = async () => {
       await initDb();
       setReady(true);
-      runMigrations();  // ← enable once
+      //runMigrations();  // ← enable once
     };
     initialize();
   }, []);
