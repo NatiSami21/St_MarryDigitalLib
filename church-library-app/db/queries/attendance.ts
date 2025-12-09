@@ -58,9 +58,9 @@ export async function createAttendanceRecord(shift_id: number, username: string)
   const ts = Date.now();
 
   await runAsync(
-    `INSERT INTO shift_attendance (shift_id, librarian_username, clock_in, clock_out, status, synced, created_at, updated_at)
-     VALUES (?, ?, NULL, NULL, 'not_started', 0, ?, ?)`,
-    [shift_id, username, ts, ts]
+    `INSERT INTO shift_attendance (shift_id, librarian_username, clock_in, clock_out, status, synced)
+     VALUES (?, ?, NULL, NULL, 'not_started', 0)`,
+    [shift_id, username]
   );
 
   // add commit for sync engine
@@ -77,9 +77,9 @@ export async function clockIn(shift_id: number, username: string) {
 
   await runAsync(
     `UPDATE shift_attendance
-     SET clock_in = ?, status = 'in_progress', updated_at = ?
+     SET clock_in = ?, status = 'in_progress'
      WHERE shift_id = ? AND librarian_username = ?`,
-    [ts, ts, shift_id, username]
+    [ts, shift_id, username]
   );
 
   await addCommit("clock_in", "shift_attendance", {
@@ -97,9 +97,9 @@ export async function clockOut(shift_id: number, username: string) {
 
   await runAsync(
     `UPDATE shift_attendance
-     SET clock_out = ?, status = 'completed', updated_at = ?
+     SET clock_out = ?, status = 'completed'
      WHERE shift_id = ? AND librarian_username = ?`,
-    [ts, ts, shift_id, username]
+    [ts, shift_id, username]
   );
 
   await addCommit("clock_out", "shift_attendance", {

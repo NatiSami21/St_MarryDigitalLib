@@ -8,9 +8,8 @@ export interface Librarian {
   username: string;
   full_name: string;
   role: "admin" | "librarian";
-  pin_salt: string;  
+  pin_salt: string | null;  // FIXED
   device_id: string | null;
-  salt: string | null;
   pin_hash: string | null;
   deleted: number;
 }
@@ -34,6 +33,7 @@ export async function getLibrarianByUsername(username: string): Promise<Libraria
     [username]
   );
 }
+
 export async function isUsernameTaken(username: string): Promise<boolean> {
   const row = await getOneAsync<{ count: number }>(
     `SELECT COUNT(*) AS count FROM librarians WHERE username = ?`,
@@ -47,23 +47,21 @@ export interface CreateLibrarianInput {
   username: string;
   full_name: string;
   role: "admin" | "librarian";
-  salt: string;
+  pin_salt: string;       // FIXED
   pin_hash: string;
 }
 
 export async function insertLibrarian(data: CreateLibrarianInput) {
-  const { username, full_name, role, salt, pin_hash } = data;
+  const { username, full_name, role, pin_salt, pin_hash } = data;
 
   await db.runAsync(
-    `INSERT INTO librarians (username, full_name, role, salt, pin_hash, deleted)
+    `INSERT INTO librarians (username, full_name, role, pin_salt, pin_hash, deleted)
      VALUES (?, ?, ?, ?, ?, 0)`,
-    [username, full_name, role, salt, pin_hash]
+    [username, full_name, role, pin_salt, pin_hash]
   );
 
-  // Commit log
   await addCommit("insert", "librarians", data);
 }
-
 
 export async function softDeleteLibrarian(id: number) {
   await db.runAsync(
@@ -81,7 +79,6 @@ export async function getLibrarianCount() {
   return row?.count ?? 0;
 }
 
-
 export async function unbindLibrarianDevice(id: number) {
   await db.runAsync(
     `UPDATE librarians SET device_id = NULL WHERE id = ?`,
@@ -90,27 +87,32 @@ export async function unbindLibrarianDevice(id: number) {
 
   await addCommit("unbind_device", "librarians", { id });
 }
+
 export async function updateLibrarianPin(
   id: number,
-  salt: string,
+  pin_salt: string,
   pin_hash: string
 ) {
   await db.runAsync(
-    `UPDATE librarians SET salt = ?, pin_hash = ? WHERE id = ?`,
-    [salt, pin_hash, id]
+    `UPDATE librarians SET pin_salt = ?, pin_hash = ? WHERE id = ?`,
+    [pin_salt, pin_hash, id]
   );
 
-  await addCommit("reset_pin", "librarians", { id, salt, pin_hash });
+  await addCommit("reset_pin", "librarians", { id, pin_salt, pin_hash });
 }
 
 export async function updateLibrarian(
   id: number,
   fields: Partial<Omit<Librarian, "id">>
 ) {
-  const keys = Object.keys(fields);
-  const values = Object.values(fields);
+  // Only allow updates to known columns to avoid accidental SQL errors
+  const allowed = new Set(["username", "full_name", "role", "device_id", "pin_salt", "pin_hash", "deleted", "created_at", "updated_at"]);
+  const entries = Object.entries(fields).filter(([k]) => allowed.has(k));
 
-  if (keys.length === 0) return;
+  if (entries.length === 0) return;
+
+  const keys = entries.map(([k]) => k);
+  const values = entries.map(([, v]) => v);
 
   const set = keys.map(k => `${k} = ?`).join(", ");
 
@@ -119,5 +121,5 @@ export async function updateLibrarian(
     [...values, id]
   );
 
-  await addCommit("update", "librarians", { id, ...fields });
+  await addCommit("update", "librarians", { id, ...Object.fromEntries(entries) });
 }

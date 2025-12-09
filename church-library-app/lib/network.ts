@@ -1,5 +1,6 @@
 // lib/network.ts
 import Constants from "expo-constants";
+import { generateSalt, hashPin } from "./authUtils";
 
 /**
  * Use env: EXPO_PUBLIC_ONLINE_MODE=true to enable real requests.
@@ -17,23 +18,51 @@ export async function postActivate(payload: ActivatePayload) {
 
     // demo validation logic:
     if (username === "DiguwaSoft" && pin === "1366") {
+      const salt = generateSalt();
+      const hash = await hashPin(pin, salt);
       return {
         ok: true,
         role: "admin",
-        require_pin_change: false,
+        require_pin_change: true,
         last_pulled_commit: "init-0001",
-        snapshot: mockSnapshot(),
+        snapshot: mockSnapshot([
+          {
+            username: "DiguwaSoft",
+            full_name: "Diguwa Soft Admin",
+            role: "admin",
+            pin_salt: salt,
+            pin_hash: hash,
+            device_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted: 0,
+          },
+        ]),
       };
     }
 
     // simulate: if username startsWith lib and pin === '0000' allow activation with require_pin_change true
     if (username.toLowerCase().startsWith("lib") && (pin === "0000" || pin === "1234")) {
+      const salt = generateSalt();
+      const hash = await hashPin(pin, salt);
       return {
         ok: true,
         role: "librarian",
         require_pin_change: true,
         last_pulled_commit: "init-0001",
-        snapshot: mockSnapshot(),
+        snapshot: mockSnapshot([
+          {
+            username: username,
+            full_name: "Demo Librarian",
+            role: "librarian",
+            pin_salt: salt,
+            pin_hash: hash,
+            device_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted: 0,
+          },
+        ]),
       };
     }
 
@@ -58,7 +87,32 @@ export async function postActivate(payload: ActivatePayload) {
 }
 
 /** Mock snapshot shape — adjust to match your real snapshot */
-function mockSnapshot() {
+function mockSnapshot(librariansOverride?: any[]) {
+  const baseLibrarians = librariansOverride ?? [
+    {
+      username: "DiguwaSoft",
+      full_name: "Diguwa Soft Admin",
+      role: "admin",
+      pin_salt: "srv-salt",
+      pin_hash: "srv-hash",
+      device_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted: 0,
+    },
+    {
+      username: "lib1",
+      full_name: "Demo Librarian",
+      role: "librarian",
+      pin_salt: "srv-salt",
+      pin_hash: "srv-hash",
+      device_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted: 0,
+    },
+  ];
+
   return {
     books: [
       { book_code: "book-1", title: "Sample Book A", author: "Author A", category: "General", notes: "", copies: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" },
@@ -67,30 +121,7 @@ function mockSnapshot() {
     users: [
       { fayda_id: "user-1", name: "Test User", phone: "0912345678", photo_uri: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" },
     ],
-    librarians: [
-      { 
-        username: "DiguwaSoft",
-        full_name: "Diguwa Soft Admin",
-        role: "admin",
-        pin_salt: "srv-salt",
-        pin_hash: "srv-hash",
-        device_id: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deleted: 0
-      },
-      { 
-        username: "lib1",
-        full_name: "Demo Librarian",
-        role: "librarian",
-        pin_salt: "srv-salt",
-        pin_hash: "srv-hash",
-        device_id: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deleted: 0
-      }
-    ],
+    librarians: baseLibrarians,
     commits: [],
   };
 }

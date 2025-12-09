@@ -90,14 +90,14 @@ export default function ManageLibrarians() {
           style: "destructive",
           onPress: async () => {
             const salt = generateSalt();
-            const newPin = "0000"; // temporary PIN
+            const newPin = "4567"; // temporary PIN
             const hash = await hashPin(newPin, salt);
 
             await updateLibrarianPin(lib.id, salt, hash);
 
             Alert.alert(
               "PIN Reset",
-              `Temporary PIN for ${lib.full_name} is: 0000\nAsk them to change it on next login.`
+              `Temporary PIN for ${lib.full_name} is: 4567\nAsk them to change it on next login.`
             );
           },
         },

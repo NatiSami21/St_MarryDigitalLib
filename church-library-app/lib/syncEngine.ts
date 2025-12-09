@@ -297,15 +297,15 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
 
     if (Array.isArray(snapshot.librarians)) {
       for (const L of snapshot.librarians) {
-        // keep local fields: username, full_name, role, device_id, salt, pin_hash, deleted
+        // keep local fields: username, full_name, role, device_id, pin_salt, pin_hash, deleted
         await runAsync(
-          `INSERT INTO librarians (username, full_name, role, device_id, salt, pin_hash, deleted)
+          `INSERT INTO librarians (username, full_name, role, device_id, pin_salt, pin_hash, deleted)
            VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(username) DO UPDATE SET
              full_name = excluded.full_name,
              role = excluded.role,
              device_id = excluded.device_id,
-             salt = excluded.salt,
+             pin_salt = excluded.pin_salt,
              pin_hash = excluded.pin_hash,
              deleted = excluded.deleted;
           `,
@@ -314,7 +314,8 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
             L.full_name ?? L.username,
             L.role ?? "librarian",
             L.device_id ?? null,
-            L.salt ?? null,
+            // snapshot may use either `pin_salt` or legacy `salt` — prefer pin_salt
+            (L.pin_salt ?? L.salt) ?? null,
             L.pin_hash ?? null,
             L.deleted ?? 0,
           ]
@@ -324,17 +325,19 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
 
     if (Array.isArray(snapshot.transactions)) {
       for (const t of snapshot.transactions) {
+        // Map snapshot to local transactions schema: tx_id, book_code, fayda_id, borrowed_at, returned_at, device_id, sync_status
+        const borrowedAt = t.borrowed_at ?? t.timestamp ?? new Date().toISOString();
+        const returnedAt = t.returned_at ?? null;
+        const syncStatus = t.sync_status ?? (returnedAt ? "returned" : "synced");
+
         await runAsync(
-          `INSERT INTO transactions (tx_id, book_code, fayda_id, type, timestamp, borrowed_at, returned_at, status, device_id, sync_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO transactions (tx_id, book_code, fayda_id, borrowed_at, returned_at, device_id, sync_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(tx_id) DO UPDATE SET
              book_code = excluded.book_code,
              fayda_id = excluded.fayda_id,
-             type = excluded.type,
-             timestamp = excluded.timestamp,
              borrowed_at = excluded.borrowed_at,
              returned_at = excluded.returned_at,
-             status = excluded.status,
              device_id = excluded.device_id,
              sync_status = excluded.sync_status;
           `,
@@ -342,13 +345,10 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
             t.tx_id,
             t.book_code,
             t.fayda_id,
-            t.type ?? "borrow",
-            t.timestamp ?? new Date().toISOString(),
-            t.borrowed_at ?? t.timestamp ?? new Date().toISOString(),
-            t.returned_at ?? null,
-            t.status ?? (t.returned_at ? "returned" : "borrowed"),
+            borrowedAt,
+            returnedAt,
             t.device_id ?? null,
-            t.sync_status ?? "synced",
+            syncStatus,
           ]
         );
       }

@@ -92,13 +92,24 @@ export async function applySnapshot({
             l.pin_salt ?? "",
             l.pin_hash ?? "",
             l.role ?? "librarian",
-            l.device_id ?? null,
+            // Set device_id to null initially for all librarians
+            null,
             l.created_at ?? new Date().toISOString(),
             l.updated_at ?? new Date().toISOString(),
             l.deleted ?? 0,
           ]
         );
       }
+    }
+
+    // CRITICAL FIX: Update device_id for the activating librarian
+    // This ensures the admin/librarian who activated this device gets their device_id bound
+    if (activatedBy && device_id) {
+      console.log(`Binding device ${device_id} to librarian ${activatedBy}`);
+      await runAsync(
+        `UPDATE librarians SET device_id = ?, updated_at = ? WHERE username = ?`,
+        [device_id, new Date().toISOString(), activatedBy]
+      );
     }
 
     //
@@ -143,6 +154,18 @@ export async function applySnapshot({
 
     await runAsync(
       `INSERT OR REPLACE INTO meta (key,value)
+       VALUES ('activated_by', ?)`,
+      [activatedBy]
+    );
+
+    await runAsync(
+      `INSERT OR REPLACE INTO meta (key,value)
+       VALUES ('activated_at', ?)`,
+      [new Date().toISOString()]
+    );
+
+    await runAsync(
+      `INSERT OR REPLACE INTO meta (key,value)
        VALUES ('initialized', '1')`
     );
 
@@ -160,11 +183,16 @@ export async function applySnapshot({
         activatedBy ?? "system",
         device_id ?? "",
         "activation",
-        JSON.stringify({ activatedBy }),
+        JSON.stringify({ 
+          activatedBy,
+          device_id,
+          timestamp: new Date().toISOString()
+        }),
         new Date().toISOString(),
       ]
     );
 
+    console.log(`✅ Snapshot applied successfully for ${activatedBy} on device ${device_id}`);
     return true;
 
   } catch (e) {
