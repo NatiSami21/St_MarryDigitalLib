@@ -33,16 +33,25 @@ serve(async (req: Request) => {
         { status: 400 }
       );
     }
+ 
+    // 2. Verify PIN using SHA256 (NOT bcrypt)
+    async function sha256(input: string) {
+      const data = new TextEncoder().encode(input);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
 
-    // 2. Verify PIN
-    const validPin = await bcrypt.compare(pin, librarian.pin_hash);
+    const computedHash = await sha256(`${librarian.pin_salt}:${pin}`);
 
-    if (!validPin) {
+    if (computedHash !== librarian.pin_hash) {
       return new Response(
         JSON.stringify({ ok: false, reason: "Incorrect PIN" }),
         { status: 401 }
       );
     }
+
 
     // 3. If first login → force pin change
     const require_pin_change = librarian.pin_hash === "" || librarian.pin_salt === "";
