@@ -1,26 +1,49 @@
-// -- VALID IMPORTS FOR EDGE FUNCTIONS -- //
+// ============================================================
+//  AUTH-ACTIVATE EDGE FUNCTION  (FINAL PATCHED VERSION)
+// ============================================================
+
+// ✔ Only valid imports for Supabase Edge Runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-// ----------- CREATE SUPABASE CLIENT -----------
+// ============================================================
+//  CREATE SUPABASE CLIENT (SERVICE ROLE)
+// ============================================================
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
 const supabase = createClient(supabaseUrl, serviceKey);
 
-// ----------- MAIN FUNCTION -----------
+// ============================================================
+//  SHA-256 HASH (salt:pin)
+// ============================================================
+
+async function sha256(input: string) {
+  const data = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// ============================================================
+//  MAIN HANDLER
+// ============================================================
+
 serve(async (req: Request) => {
   try {
-    const { username, pin, device_id } = await req.json();
+    const body = await req.json();
+    const { username, pin, device_id } = body;
 
+    // Basic validation
     if (!username || !pin || !device_id) {
-      return new Response(
-        JSON.stringify({ ok: false, reason: "Missing required fields" }),
-        { status: 400 }
-      );
+      return jsonError("Missing required fields", 400);
     }
 
+    // ------------------------------------------------------------
     // 1. Fetch librarian
+    // ------------------------------------------------------------
     const { data: librarian, error: libErr } = await supabase
       .from("librarians")
       .select("*")
@@ -28,43 +51,48 @@ serve(async (req: Request) => {
       .single();
 
     if (libErr || !librarian) {
-      return new Response(
-        JSON.stringify({ ok: false, reason: "Invalid username" }),
-        { status: 400 }
-      );
-    }
- 
-    // 2. Verify PIN using SHA256 (NOT bcrypt)
-    async function sha256(input: string) {
-      const data = new TextEncoder().encode(input);
-      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-      return Array.from(new Uint8Array(hashBuffer))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
+      return jsonError("Invalid username", 400);
     }
 
-    const computedHash = await sha256(`${librarian.pin_salt}:${pin}`);
+    // ------------------------------------------------------------
+    // 2. Verify PIN using SHA-256(salt:pin)
+    // ------------------------------------------------------------
+    const expectedHash = await sha256(`${librarian.pin_salt}:${pin}`);
 
-    if (computedHash !== librarian.pin_hash) {
-      return new Response(
-        JSON.stringify({ ok: false, reason: "Incorrect PIN" }),
-        { status: 401 }
-      );
+    if (expectedHash !== librarian.pin_hash) {
+      return jsonError("Incorrect PIN", 401);
     }
 
+    // ------------------------------------------------------------
+    // 3. Determine if user must change PIN
+    //
+    // REQUIREMENT:
+    //   A boolean field "require_pin_change" must be in DB.
+    //   - true  → force change now
+    //   - false → normal login
+    // ------------------------------------------------------------
+    const require_pin_change = librarian.require_pin_change === true;
 
-    // 3. If first login → force pin change
-    const require_pin_change = librarian.pin_hash === "" || librarian.pin_salt === "";
+    // ------------------------------------------------------------
+    // 4. Bind device to librarian (trust non-admin accounts too)
+    // ------------------------------------------------------------
 
-    // 4. Bind device
     await supabase
       .from("librarians")
-      .update({ device_id, updated_at: new Date().toISOString() })
+      .update({
+        device_id: device_id,
+        updated_at: new Date().toISOString(),
+      })
       .eq("username", username);
 
-    // 5. Fetch full snapshot
+    // ------------------------------------------------------------
+    // 5. Build full database snapshot
+    // ------------------------------------------------------------
     const snapshot = await buildSnapshot();
 
+    // ------------------------------------------------------------
+    // 6. Return success response
+    // ------------------------------------------------------------
     return new Response(
       JSON.stringify({
         ok: true,
@@ -73,44 +101,66 @@ serve(async (req: Request) => {
         require_pin_change,
         last_pulled_commit: null,
       }),
-      { status: 200 }
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
     );
   } catch (err) {
     console.error("AUTH ACTIVATE ERROR:", err);
-    return new Response(JSON.stringify({ ok: false, reason: "Server error" }), {
-      status: 500,
-    });
+    return jsonError("Server error", 500);
   }
 });
 
-// ----------- BUILD SNAPSHOT -----------
-async function buildSnapshot() {
-  const tables = ["users", "books", "librarians", "transactions", "commits"];
+// ============================================================
+//  BUILD SNAPSHOT (clean & correct)
+// ============================================================
 
+async function buildSnapshot() {
   const snapshot: Record<string, any[]> = {};
 
+  const tables = [
+    "users",
+    "books",
+    "librarians",
+    "transactions",
+    "commits",
+  ];
+
   for (const t of tables) {
-    const { data } = await supabase.from(t).select("*");
-    snapshot[t] = data ?? [];
+    const { data, error } = await supabase.from(t).select("*");
+
+    if (error) {
+      console.error(`SNAPSHOT ERROR on table ${t}`, error);
+      snapshot[t] = [];
+    } else {
+      snapshot[t] = data ?? [];
+    }
   }
 
-  // Add shift schedule
-  snapshot["shifts"] = await getShiftsSnapshot();
-
-  return snapshot;
-}
-
-// ----------- GET SHIFTS SNAPSHOT -----------
-
-async function getShiftsSnapshot() {
-  const { data, error } = await supabase
+  // ---- SHIFTS (only non-deleted) ----
+  const { data: shiftData, error: shiftErr } = await supabase
     .from("shifts")
     .select("*")
     .eq("deleted", 0);
 
-  if (error) {
-    console.error("SHIFT FETCH ERROR:", error);
-    return [];
+  if (shiftErr) {
+    console.error("SHIFT FETCH ERROR:", shiftErr);
+    snapshot["shifts"] = [];
+  } else {
+    snapshot["shifts"] = shiftData ?? [];
   }
-  return data || [];
+
+  return snapshot;
+}
+
+// ============================================================
+//  JSON ERROR RESPONSE HELPER
+// ============================================================
+
+function jsonError(message: string, status = 400) {
+  return new Response(JSON.stringify({ ok: false, reason: message }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }

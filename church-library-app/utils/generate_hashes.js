@@ -1,3 +1,4 @@
+// church-library-app/utils/generate_hashes.js
 const crypto = require('crypto');
 
 // --- Inputs ---

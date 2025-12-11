@@ -1,3 +1,4 @@
+// church-library-app/lib/authUtils.ts
 import * as Crypto from "expo-crypto";
 
 /**
