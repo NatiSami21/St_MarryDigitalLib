@@ -16,6 +16,10 @@ import { applySnapshot } from "../../lib/activation";
 import { postActivate } from "../../lib/network";
 import * as Device from "expo-device";
 
+console.log("ONLINE MODE:", process.env.EXPO_PUBLIC_ONLINE_MODE);
+console.log("API BASE URL:", process.env.EXPO_PUBLIC_API_BASE_URL);
+
+
 export default function LoginCloud() {
   const router = useRouter();
   const [username, setUsername] = useState("");

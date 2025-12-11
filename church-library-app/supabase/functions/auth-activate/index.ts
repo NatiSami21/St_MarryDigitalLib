@@ -85,5 +85,23 @@ async function buildSnapshot() {
     snapshot[t] = data ?? [];
   }
 
+  // Add shift schedule
+  snapshot["shifts"] = await getShiftsSnapshot();
+
   return snapshot;
+}
+
+// ----------- GET SHIFTS SNAPSHOT -----------
+
+async function getShiftsSnapshot() {
+  const { data, error } = await supabase
+    .from("shifts")
+    .select("*")
+    .eq("deleted", 0);
+
+  if (error) {
+    console.error("SHIFT FETCH ERROR:", error);
+    return [];
+  }
+  return data || [];
 }

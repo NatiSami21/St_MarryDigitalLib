@@ -69,21 +69,25 @@ export async function postActivate(payload: ActivatePayload) {
     return { ok: false, reason: "invalid_username_or_pin" };
   }
 
-  // real mode - implement your real endpoint here
+  // real mode - cloud endpoint
   try {
-    const res = await fetch("https://your-server.com/auth/activate", {
+    const base = process.env.EXPO_PUBLIC_API_BASE_URL;
+    const url = `${base}/auth-activate`;
+
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+
     if (!res.ok) {
       return { ok: false, reason: `server:${res.status}` };
     }
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (err: any) {
     return { ok: false, reason: err.message || "network_error" };
   }
+
 }
 
 /** Mock snapshot shape — adjust to match your real snapshot */

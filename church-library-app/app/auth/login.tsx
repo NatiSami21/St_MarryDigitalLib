@@ -13,6 +13,7 @@ import { getLibrarianByUsername } from "../../db/queries/librarians";
 import { verifyPinHash } from "../../lib/authUtils";
 import { saveSession } from "../../lib/session";
 import { getMetaValue } from "../../db/queries/meta"; 
+import { isInsideShift } from "../../utils/shift";
 
 
 export default function LoginScreen() {
@@ -64,6 +65,20 @@ export default function LoginScreen() {
         Alert.alert("Invalid PIN", "Incorrect PIN.");
         setLoading(false);
         return;
+      }
+
+      // SHIFT CHECK — admin bypasses
+      if (user.role === "librarian") {
+        const allowed = await isInsideShift(user.username);
+
+        if (!allowed) {
+          Alert.alert(
+            "Access Denied",
+            "❌ You are outside your scheduled shift time."
+          );
+          setLoading(false);
+          return;
+        }
       }
 
       // Save local session

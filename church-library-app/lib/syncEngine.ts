@@ -20,22 +20,33 @@
  * 
  */
 
-import { getPendingCommits, markCommitsSynced, getPendingCommitsCount } from "../db/queries/sync";
+// lib/syncEngine.ts 
+
+import {
+  getPendingCommits,
+  markCommitsSynced,
+  getPendingCommitsCount,
+} from "../db/queries/sync";
 import {
   insertSyncLog,
   setLastPushTime,
   setLastPullTime,
   getDeviceId,
 } from "../db/queries/sync";
-import { runAsync, getAllAsync, getOneAsync } from "../db/sqlite";
+import { runAsync, getOneAsync } from "../db/sqlite";
 
-const ONLINE = process.env.ONLINE_MODE === "true";
+/* -------------------------
+ * Cloud endpoints (Supabase Functions)
+ * ------------------------*/
+const base = process.env.EXPO_PUBLIC_API_BASE_URL;
 
-// Server endpoints (adjust to your server)
-const PUSH_URL = process.env.EXPO_PUBLIC_API_BASE_URL ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/sync/push` : "https://example.com/api/sync/push";
-const PULL_URL = process.env.EXPO_PUBLIC_API_BASE_URL ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/sync/pull` : "https://example.com/api/sync/pull";
+const PUSH_URL = `${base}/sync-push`;
+const PULL_URL = `${base}/sync-pull`;
 
-// controls
+const ONLINE =
+  process.env.EXPO_PUBLIC_ONLINE_MODE === "true" ||
+  process.env.NODE_ENV === "production";
+
 const BATCH_SIZE = 50;
 
 /* -------------------------
@@ -55,11 +66,10 @@ function safeJsonParse<T = any>(s: string | null): T | null {
 }
 
 /* -------------------------
- * Mocked server behavior (for offline testing)
+ * Mock offline server (dev mode)
  * ------------------------*/
 async function mockedPush(payload: any) {
   await delay(300);
-  // Accept everything and pretend commit ids returned as pushed
   return {
     ok: true,
     pushedIds: payload.map((c: any) => c.id),
@@ -69,7 +79,6 @@ async function mockedPush(payload: any) {
 
 async function mockedPull(deviceId: string | null, lastPull: string | null) {
   await delay(300);
-  // Return an empty snapshot (nothing new) for testing
   return {
     ok: true,
     snapshot: {
@@ -84,24 +93,27 @@ async function mockedPull(deviceId: string | null, lastPull: string | null) {
   };
 }
 
-/* -------------------------
- * Push pending commits
- * ------------------------*/
-export async function pushPendingCommits(): Promise<{ success: boolean; pushedIds?: number[]; message?: string }> {
+/* --------------------------------------------------
+ * PUSH — Send pending commits to server
+ * --------------------------------------------------*/
+export async function pushPendingCommits(): Promise<{
+  success: boolean;
+  pushedIds?: number[];
+  message?: string;
+}> {
   try {
     const pending = await getPendingCommits();
     if (pending.length === 0) {
       return { success: true, pushedIds: [], message: "No pending commits" };
     }
 
-    // chunk the commits
+    // chunk in batches
     const chunks: typeof pending[] = [];
     for (let i = 0; i < pending.length; i += BATCH_SIZE) {
       chunks.push(pending.slice(i, i + BATCH_SIZE));
     }
 
     const deviceId = await getDeviceId();
-
     const pushedIds: number[] = [];
 
     for (const chunk of chunks) {
@@ -132,16 +144,14 @@ export async function pushPendingCommits(): Promise<{ success: boolean; pushedId
       }
 
       if (!response.ok) {
-        // Log failure and stop
-        await insertSyncLog(deviceId, "failed", `Push chunk failed: ${JSON.stringify(response)}`);
-        return { success: false, message: "Server rejected chunk" };
+        await insertSyncLog(deviceId, "failed", `Push rejected: ${JSON.stringify(response)}`);
+        return { success: false, message: "Server rejected push" };
       }
 
-      const returnedIds: number[] = response.pushedIds ?? chunk.map((c) => c.id);
-      pushedIds.push(...returnedIds);
+      const returned = response.pushedIds ?? chunk.map((c) => c.id);
+      pushedIds.push(...returned);
 
-      // mark them as synced locally
-      await markCommitsSynced(returnedIds);
+      await markCommitsSynced(returned);
     }
 
     const now = new Date().toISOString();
@@ -157,30 +167,45 @@ export async function pushPendingCommits(): Promise<{ success: boolean; pushedId
   }
 }
 
-/* -------------------------
- * Pull snapshot / incremental data
- * ------------------------*/
-export async function pullSnapshot(): Promise<{ success: boolean; applied?: boolean; message?: string }> {
+/* --------------------------------------------------
+ * PULL — Request latest changes or full snapshot
+ * --------------------------------------------------*/
+export async function pullSnapshot(): Promise<{
+  success: boolean;
+  applied?: boolean;
+  message?: string;
+}> {
   try {
     const deviceId = await getDeviceId();
-    const lastPull = await getOneAsync<{ value: string }>(`SELECT value FROM meta WHERE key = 'last_pull'`);
+    const lastPullRow = await getOneAsync<{ value: string }>(
+      `SELECT value FROM meta WHERE key = 'last_pull'`
+    );
 
-    const lastPullValue = (lastPull && (lastPull as any).value) ?? null;
+    const lastPullValue = lastPullRow?.value ?? null;
+
+    // TODO: when you store session, replace placeholder username
+    const librarianUsername = "admin"; // temporary — fix after session management
 
     let response: any;
+
     if (!ONLINE) {
       response = await mockedPull(deviceId, lastPullValue);
     } else {
       const res = await fetch(PULL_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: deviceId, last_pulled_commit: lastPullValue }),
+        body: JSON.stringify({
+          device_id: deviceId,
+          librarian_username: librarianUsername,
+          last_pulled_commit: lastPullValue,
+        }),
       });
 
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Pull failed: ${res.status} ${text}`);
       }
+
       response = await res.json();
     }
 
@@ -190,13 +215,13 @@ export async function pullSnapshot(): Promise<{ success: boolean; applied?: bool
     }
 
     const snapshot = response.snapshot;
-
-    // Apply snapshot locally (safe, idempotent)
     const applied = await applySnapshotLocally(snapshot);
 
     const now = response.serverTime ?? new Date().toISOString();
     await setLastPullTime(now);
-    await insertSyncLog(deviceId, "success", `Pulled snapshot - applied: ${applied ? "yes" : "no"}`);
+
+    await insertSyncLog(deviceId, "success", `Pulled snapshot (applied=${applied})`);
+
     return { success: true, applied };
   } catch (err: any) {
     try {
@@ -207,38 +232,23 @@ export async function pullSnapshot(): Promise<{ success: boolean; applied?: bool
   }
 }
 
-/* -------------------------
- * Apply snapshot locally
- * Snapshot shape (expected):
- *  {
- *    books: [...],
- *    users: [...],
- *    librarians: [...],
- *    transactions: [...],
- *    pending_commits: [...],
- *    last_pulled_commit: string
- *  }
- *
- * This function does conservative upserts using simple INSERT OR REPLACE logic.
- * ------------------------*/
+/* --------------------------------------------------
+ * Apply snapshot locally (idempotent upsert)
+ * --------------------------------------------------*/
 export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
   if (!snapshot) return false;
 
-  // Basic validation
   const tables = ["books", "users", "librarians", "transactions", "pending_commits"];
   const hasAny = tables.some((t) => Array.isArray(snapshot[t]) && snapshot[t].length > 0);
 
-  // If snapshot empty, still update metadata if provided
   if (!hasAny && !snapshot.last_pulled_commit) return false;
 
   try {
-    // Use a single transaction for safety
     await runAsync("BEGIN TRANSACTION");
 
-    // NOTE: Keep these upserts conservative - replace only core fields.
+    /* --------- BOOKS -------- */
     if (Array.isArray(snapshot.books)) {
       for (const b of snapshot.books) {
-        // Expected minimal book shape: { book_code, title, author, category, notes, copies, created_at, updated_at, sync_status }
         await runAsync(
           `INSERT INTO books (book_code, title, author, category, notes, copies, created_at, updated_at, sync_status)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -249,8 +259,7 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
              notes = excluded.notes,
              copies = excluded.copies,
              updated_at = excluded.updated_at,
-             sync_status = excluded.sync_status;
-          `,
+             sync_status = excluded.sync_status`,
           [
             b.book_code,
             b.title ?? "",
@@ -266,6 +275,7 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
       }
     }
 
+    /* -------- USERS --------- */
     if (Array.isArray(snapshot.users)) {
       for (const u of snapshot.users) {
         await runAsync(
@@ -278,8 +288,7 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
              address = excluded.address,
              photo_uri = excluded.photo_uri,
              updated_at = excluded.updated_at,
-             sync_status = excluded.sync_status;
-          `,
+             sync_status = excluded.sync_status`,
           [
             u.fayda_id,
             u.name ?? "",
@@ -295,9 +304,9 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
       }
     }
 
+    /* -------- LIBRARIANS -------- */
     if (Array.isArray(snapshot.librarians)) {
       for (const L of snapshot.librarians) {
-        // keep local fields: username, full_name, role, device_id, pin_salt, pin_hash, deleted
         await runAsync(
           `INSERT INTO librarians (username, full_name, role, device_id, pin_salt, pin_hash, deleted)
            VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -307,14 +316,12 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
              device_id = excluded.device_id,
              pin_salt = excluded.pin_salt,
              pin_hash = excluded.pin_hash,
-             deleted = excluded.deleted;
-          `,
+             deleted = excluded.deleted`,
           [
             L.username,
             L.full_name ?? L.username,
             L.role ?? "librarian",
             L.device_id ?? null,
-            // snapshot may use either `pin_salt` or legacy `salt` — prefer pin_salt
             (L.pin_salt ?? L.salt) ?? null,
             L.pin_hash ?? null,
             L.deleted ?? 0,
@@ -323,9 +330,9 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
       }
     }
 
+    /* -------- TRANSACTIONS -------- */
     if (Array.isArray(snapshot.transactions)) {
       for (const t of snapshot.transactions) {
-        // Map snapshot to local transactions schema: tx_id, book_code, fayda_id, borrowed_at, returned_at, device_id, sync_status
         const borrowedAt = t.borrowed_at ?? t.timestamp ?? new Date().toISOString();
         const returnedAt = t.returned_at ?? null;
         const syncStatus = t.sync_status ?? (returnedAt ? "returned" : "synced");
@@ -339,8 +346,7 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
              borrowed_at = excluded.borrowed_at,
              returned_at = excluded.returned_at,
              device_id = excluded.device_id,
-             sync_status = excluded.sync_status;
-          `,
+             sync_status = excluded.sync_status`,
           [
             t.tx_id,
             t.book_code,
@@ -354,41 +360,38 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
       }
     }
 
-    // pending_commits -> keep them local only if server returns new pending commits (rare)
+    /* -------- PENDING COMMITS -------- */
     if (Array.isArray(snapshot.pending_commits)) {
       for (const pc of snapshot.pending_commits) {
-        // insert only if not exist; keep as pending
         await runAsync(
           `INSERT OR IGNORE INTO pending_commits (action, table_name, payload, timestamp, synced)
            VALUES (?, ?, ?, ?, ?)`,
-          [pc.action, pc.table_name, JSON.stringify(pc.payload), pc.timestamp ?? Date.now(), pc.synced ?? 0]
+          [
+            pc.action,
+            pc.table_name,
+            JSON.stringify(pc.payload),
+            pc.timestamp ?? Date.now(),
+            pc.synced ?? 0,
+          ]
         );
       }
     }
 
-    // commit transaction
     await runAsync("COMMIT");
   } catch (err) {
-    // rollback and rethrow
     try {
       await runAsync("ROLLBACK");
     } catch (_) {}
     throw err;
   }
 
-  // update last_pulled_commit if present
-  if (snapshot.last_pulled_commit) {
-    await setLastPullTime(snapshot.last_pulled_commit);
-  }
-
   return true;
 }
 
-/* -------------------------
- * Full sync: push then pull
- * ------------------------*/
+/* ---------------------------
+ * FULL SYNC = push → pull
+ * ---------------------------*/
 export async function syncAll(): Promise<{ success: boolean; details: any }> {
-  // push first to ensure local commits reach server
   const pushResult = await pushPendingCommits();
   if (!pushResult.success) {
     return { success: false, details: { push: pushResult } };
@@ -402,15 +405,20 @@ export async function syncAll(): Promise<{ success: boolean; details: any }> {
   return { success: true, details: { push: pushResult, pull: pullResult } };
 }
 
-/* -------------------------
- * Utility: quick status
- * ------------------------*/
+/* ---------------------------
+ * Utility
+ * ---------------------------*/
 export async function getSyncStatus() {
-  const pendingCount = await getPendingCommitsCount();
-  const lastPush = await getOneAsync<{ value: string }>(`SELECT value FROM meta WHERE key = 'last_push'`);
-  const lastPull = await getOneAsync<{ value: string }>(`SELECT value FROM meta WHERE key = 'last_pull'`);
+  const pending = await getPendingCommitsCount();
+  const lastPush = await getOneAsync<{ value: string }>(
+    `SELECT value FROM meta WHERE key = 'last_push'`
+  );
+  const lastPull = await getOneAsync<{ value: string }>(
+    `SELECT value FROM meta WHERE key = 'last_pull'`
+  );
+
   return {
-    pending: pendingCount,
+    pending,
     lastPush: lastPush?.value ?? null,
     lastPull: lastPull?.value ?? null,
   };

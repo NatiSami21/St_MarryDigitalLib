@@ -7,7 +7,7 @@ import { runAsync, execSync } from "../db/sqlite";
 export async function applySnapshot({
   snapshot,
   device_id,
-  activatedBy,
+  activatedBy, 
   lastPulledCommit,
 }: {
   snapshot: any;
@@ -110,6 +110,29 @@ export async function applySnapshot({
         `UPDATE librarians SET device_id = ?, updated_at = ? WHERE username = ?`,
         [device_id, new Date().toISOString(), activatedBy]
       );
+    }
+
+    // This ensures shift schedule is always up-to-date.
+    if (Array.isArray(snapshot.shifts)) {
+      // Replace local shifts with snapshot shifts
+      await runAsync(`DELETE FROM shifts;`);
+      for (const s of snapshot.shifts) {
+        await runAsync(
+          `INSERT OR REPLACE INTO shifts 
+            (id, librarian_username, date, start_time, end_time, created_at, updated_at, deleted)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            s.id,
+            s.librarian_username ?? "",
+            s.date ?? null,
+            s.start_time ?? null,
+            s.end_time ?? null,
+            s.created_at ?? new Date().toISOString(),
+            s.updated_at ?? new Date().toISOString(),
+            s.deleted ?? 0,
+          ]
+        );
+      }
     }
 
     //

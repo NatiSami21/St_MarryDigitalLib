@@ -1,6 +1,7 @@
 // db/queries/shifts.ts
 import { getAllAsync, runAsync } from "../sqlite";
 import { addCommit } from "../commits";
+import { db } from "../sqlite";
 
 export interface Shift {
   id: number;
@@ -84,4 +85,14 @@ export async function updateShift(id: number, fields: Partial<Shift>) {
   );
 
   await addCommit("update", "shifts", { id, ...fields });
+}
+
+
+export async function getShiftsForLibrarian(username: string) {
+  return await db.getAllAsync(
+    `SELECT * FROM shifts 
+     WHERE librarian_username = ? 
+     AND deleted = 0`,
+    [username]
+  );
 }
