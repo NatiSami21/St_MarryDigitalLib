@@ -1,4 +1,3 @@
-
 // lib/network.ts
 import Constants from "expo-constants";
 import { generateSalt, hashPin } from "./authUtils";
@@ -65,18 +64,39 @@ export async function postActivate(payload: ActivatePayload) {
       body: JSON.stringify(payload),
     });
 
-    // Show raw status if failure
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.log("❌ RAW SERVER RESPONSE:", text);
-      return { ok: false, reason: `server:${res.status}` };
+    // Get the response text first for debugging
+    const responseText = await res.text();
+    console.log("📦 RAW SERVER RESPONSE:", responseText);
+
+    let data;
+    try {
+      // Try to parse as JSON
+      data = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.log("❌ JSON PARSE ERROR:", parseErr);
+      // If it's not valid JSON, check the status code
+      if (!res.ok) {
+        return { ok: false, reason: `server:${res.status}` };
+      }
+      return { ok: false, reason: "invalid_server_response" };
     }
 
-    // Return JSON
-    return await res.json();
+    // Edge functions often return 200 with ok:false errors
+    // But they can also return 400/401 with ok:false in the body
+    if (!data.ok) {
+      console.log("❌ SERVER RETURNED ok:false, reason:", data.reason);
+      return { 
+        ok: false, 
+        reason: data.reason || "activation_failed" 
+      };
+    }
+
+    // If we get here, data.ok is true
+    console.log("✅ ACTIVATION SUCCESS");
+    return data;
   } catch (err: any) {
     console.log("❌ NETWORK ERROR:", err);
-    return { ok: false, reason: err.message || "network_error" };
+    return { ok: false, reason: "network_error" };
   }
 }
 
