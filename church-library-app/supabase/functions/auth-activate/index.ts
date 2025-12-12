@@ -1,3 +1,4 @@
+
 // supabase/functions/auth-activate/index.ts
 // Patched, tolerant, debug-friendly auth-activate for Supabase Edge Functions
 
@@ -138,23 +139,14 @@ serve(async (req: Request) => {
       return jsonError("Incorrect PIN", 401);
     }
 
-    // Determine require_pin_change
-    // Default admin "DiguwaSoft" MUST change PIN on first login
-    // Newly created admins/librarians SHOULD also change PIN
+    // Determine require_pin_change (if you prefer field vs sentinel values)
+    // Accept either explicit boolean field 'require_pin_change' or legacy logic: empty hash/salt => require
     let require_pin_change = false;
-    
     if (typeof librarian.require_pin_change === "boolean") {
-      // Use the explicit boolean field if it exists
       require_pin_change = librarian.require_pin_change;
     } else {
-      // Logic for default admin: If username is DiguwaSoft and role is admin, require PIN change
-      if (librarian.username === "DiguwaSoft" && librarian.role === "admin") {
-        require_pin_change = true;
-        if (DEBUG) console.log("Default admin detected, requiring PIN change");
-      } else {
-        // Legacy fallback for other users: require PIN change if hash/salt is empty
-        require_pin_change = storedHashRaw === "" || storedSaltRaw === "";
-      }
+      // legacy fallback
+      require_pin_change = storedHashRaw === "" || storedSaltRaw === "";
     }
 
     // Bind device_id (update DB)
@@ -192,7 +184,7 @@ serve(async (req: Request) => {
       }
     }
 
-    // Success response with require_pin_change flag
+    // Success response
     const resp = {
       ok: true,
       snapshot,
@@ -201,7 +193,7 @@ serve(async (req: Request) => {
       last_pulled_commit: null,
     };
 
-    if (DEBUG) console.log("Activation success for", librarian.username, "require_pin_change:", require_pin_change);
+    if (DEBUG) console.log("Activation success for", librarian.username);
 
     return new Response(JSON.stringify(resp), {
       status: 200,
