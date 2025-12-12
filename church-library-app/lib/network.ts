@@ -4,22 +4,26 @@ import { generateSalt, hashPin } from "./authUtils";
 
 /**
  * Use env: EXPO_PUBLIC_ONLINE_MODE=true to enable real requests.
- * Default: mocked responses (local).
  */
-const ONLINE = (process.env.EXPO_PUBLIC_ONLINE_MODE === "true") || false;
+const ONLINE = process.env.EXPO_PUBLIC_ONLINE_MODE === "true";
 
 type ActivatePayload = { username: string; pin: string; device_id: string };
 
+// --- CLEAN BASE URL FUNCTION ---
+function cleanBaseUrl(url?: string): string {
+  if (!url) return "";
+  return url.replace(/\/+$/, ""); // remove trailing slashes
+}
+
 export async function postActivate(payload: ActivatePayload) {
   if (!ONLINE) {
-    // mocked behaviour:
-    // Accept DiguwaSoft / 1366 or any username that starts with "lib" for demo
-    const { username, pin, device_id } = payload;
+    // ---- LOCAL MOCK MODE ----
+    const { username, pin } = payload;
 
-    // demo validation logic:
     if (username === "DiguwaSoft" && pin === "1366") {
       const salt = generateSalt();
       const hash = await hashPin(pin, salt);
+
       return {
         ok: true,
         role: "admin",
@@ -41,56 +45,41 @@ export async function postActivate(payload: ActivatePayload) {
       };
     }
 
-    // simulate: if username startsWith lib and pin === '0000' allow activation with require_pin_change true
-    if (username.toLowerCase().startsWith("lib") && (pin === "0000" || pin === "1234")) {
-      const salt = generateSalt();
-      const hash = await hashPin(pin, salt);
-      return {
-        ok: true,
-        role: "librarian",
-        require_pin_change: true,
-        last_pulled_commit: "init-0001",
-        snapshot: mockSnapshot([
-          {
-            username: username,
-            full_name: "Demo Librarian",
-            role: "librarian",
-            pin_salt: salt,
-            pin_hash: hash,
-            device_id: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            deleted: 0,
-          },
-        ]),
-      };
-    }
-
     return { ok: false, reason: "invalid_username_or_pin" };
   }
 
-  // real mode - cloud endpoint
+  // ---- REAL CLOUD MODE ----
   try {
-    const base = process.env.EXPO_PUBLIC_API_BASE_URL;
+    let base = cleanBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
     const url = `${base}/auth-activate`;
+
+    console.log("🔥 FINAL ACTIVATE URL:", url);
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
     });
 
+    // Show raw status if failure
     if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.log("❌ RAW SERVER RESPONSE:", text);
       return { ok: false, reason: `server:${res.status}` };
     }
+
+    // Return JSON
     return await res.json();
   } catch (err: any) {
+    console.log("❌ NETWORK ERROR:", err);
     return { ok: false, reason: err.message || "network_error" };
   }
-
 }
 
-/** Mock snapshot shape — adjust to match your real snapshot */
+// --- MOCK SNAPSHOT (unchanged) ---
 function mockSnapshot(librariansOverride?: any[]) {
   const baseLibrarians = librariansOverride ?? [
     {
@@ -103,28 +92,12 @@ function mockSnapshot(librariansOverride?: any[]) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       deleted: 0,
-    },
-    {
-      username: "lib1",
-      full_name: "Demo Librarian",
-      role: "librarian",
-      pin_salt: "srv-salt",
-      pin_hash: "srv-hash",
-      device_id: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted: 0,
-    },
+    }
   ];
 
   return {
-    books: [
-      { book_code: "book-1", title: "Sample Book A", author: "Author A", category: "General", notes: "", copies: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" },
-      { book_code: "book-2", title: "Sample Book B", author: "Author B", category: "Theology", notes: "", copies: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" },
-    ],
-    users: [
-      { fayda_id: "user-1", name: "Test User", phone: "0912345678", photo_uri: "", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" },
-    ],
+    books: [],
+    users: [],
     librarians: baseLibrarians,
     commits: [],
   };
