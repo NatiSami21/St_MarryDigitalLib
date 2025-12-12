@@ -64,18 +64,32 @@ export async function postActivate(payload: ActivatePayload) {
       body: JSON.stringify(payload),
     });
 
-    // Show raw status if failure
-    if (!res.ok) {
+    // Parse JSON response first
+    const data = await res.json().catch(async (parseErr) => {
+      // If JSON parsing fails, try to get raw text for debugging
       const text = await res.text().catch(() => "");
-      console.log("❌ RAW SERVER RESPONSE:", text);
-      return { ok: false, reason: `server:${res.status}` };
+      console.log("❌ JSON PARSE ERROR:", parseErr, "Raw text:", text);
+      return { ok: false, reason: "server_error" };
+    });
+
+    // Edge functions often return 200 with ok:false errors
+    if (!data.ok) {
+      console.log("❌ SERVER RETURNED ok:false:", data.reason);
+      return { ok: false, reason: data.reason || "activation_failed" };
     }
 
-    // Return JSON
-    return await res.json();
+    // Check HTTP status for other errors (though we should have handled ok:false above)
+    if (!res.ok) {
+      console.log("❌ HTTP ERROR STATUS:", res.status);
+      return { ok: false, reason: data.reason || `server:${res.status}` };
+    }
+
+    // Success
+    console.log("✅ ACTIVATION SUCCESS");
+    return data;
   } catch (err: any) {
     console.log("❌ NETWORK ERROR:", err);
-    return { ok: false, reason: err.message || "network_error" };
+    return { ok: false, reason: "network_error" };
   }
 }
 
