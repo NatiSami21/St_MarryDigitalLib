@@ -10,7 +10,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 interface PushCommit {
   commit_id: string;
   table_name: string;
-  action: "create" | "update" | "delete";
+  action: string;   // insert | create | update | delete
   payload: any;
   timestamp: string;
   librarian_username: string;
@@ -18,21 +18,28 @@ interface PushCommit {
 }
 
 async function applyCommit(commit: PushCommit) {
-  const { table_name, action, payload } = commit;
+  console.log("📦 APPLY COMMIT:", commit);
 
-  console.log("📦 APPLY COMMIT:", {
-    table_name,
-    action,
-    payload,
-  });
+  const { table_name, payload } = commit;
 
-  if (!payload.updated_at) {
+  // Normalize action
+  const action =
+    commit.action === "insert" ? "create" : commit.action;
+
+  // Ensure updated_at
+  if (payload && !payload.updated_at) {
     payload.updated_at = new Date().toISOString();
   }
 
   let result;
 
   switch (table_name) {
+    case "librarians":
+      if (action === "create") result = await supabase.from("librarians").insert(payload);
+      if (action === "update") result = await supabase.from("librarians").update(payload).eq("username", payload.username);
+      if (action === "delete") result = await supabase.from("librarians").delete().eq("username", payload.username);
+      break;
+
     case "books":
       if (action === "create") result = await supabase.from("books").insert(payload);
       if (action === "update") result = await supabase.from("books").update(payload).eq("book_code", payload.book_code);
@@ -51,15 +58,9 @@ async function applyCommit(commit: PushCommit) {
       if (action === "delete") result = await supabase.from("transactions").delete().eq("tx_id", payload.tx_id);
       break;
 
-    case "librarians":
-      if (action === "create") result = await supabase.from("librarians").insert(payload);
-      if (action === "update") result = await supabase.from("librarians").update(payload).eq("username", payload.username);
-      if (action === "delete") result = await supabase.from("librarians").delete().eq("username", payload.username);
-      break;
-
     default:
       console.log("❌ UNSUPPORTED TABLE:", table_name);
-      return { error: { message: `Unsupported table: ${table_name}` } };
+      return { error: { message: `Unsupported table ${table_name}` } };
   }
 
   console.log("📝 SUPABASE RESULT:", result);
@@ -70,9 +71,9 @@ async function applyCommit(commit: PushCommit) {
 serve(async (req) => {
   try {
     const body = await req.json();
-    const { device_id, librarian_username, commits } = body;
-
     console.log("🚀 sync-push received:", body);
+
+    const { device_id, librarian_username, commits } = body;
 
     if (!device_id || !librarian_username || !Array.isArray(commits)) {
       return Response.json({ ok: false, reason: "Invalid payload" }, { status: 400 });
@@ -91,38 +92,42 @@ serve(async (req) => {
       return Response.json({ ok: false, reason: "User deleted" }, { status: 403 });
 
     if (librarian.device_id !== device_id)
-      return Response.json({ ok: false, reason: "Device not authorized" }, { status: 403 });
+      return Response.json({
+        ok: false,
+        reason: "Device not authorized",
+      }, { status: 403 });
 
-    const results = [];
+    const applied = [];
 
-    for (const commit of commits) {
-      const r = await applyCommit(commit);
+    for (const c of commits) {
+      const r = await applyCommit(c);
 
       await supabase.from("commits").insert({
-        commit_id: commit.commit_id,
-        librarian_username: commit.librarian_username,
-        device_id: commit.device_id,
-        type: commit.action,
-        payload: JSON.stringify(commit.payload),
-        timestamp: commit.timestamp,
-        pushed: r.error ? 0 : 1,
+        commit_id: c.commit_id,
+        librarian_username: c.librarian_username,
+        device_id: c.device_id,
+        type: c.action,
+        payload: JSON.stringify(c.payload),
+        timestamp: c.timestamp,
+        pushed: r?.error ? 0 : 1,
       });
 
-      results.push({
-        commit_id: commit.commit_id,
-        success: !r.error,
-        error: r.error?.message || null,
+      applied.push({
+        commit_id: c.commit_id,
+        success: !r?.error,
+        error: r?.error?.message ?? null,
       });
     }
 
     return Response.json({
       ok: true,
-      applied: results,
+      applied,
       last_commit_timestamp: commits.at(-1)?.timestamp ?? null,
     });
 
-  } catch (err) {
-    console.error("❌ sync-push error:", err);
-    return Response.json({ ok: false, reason: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  } catch (error) {
+    console.error("❌ sync-push error:", error);
+    const reason = (error instanceof Error) ? error.message : String(error);
+    return Response.json({ ok: false, reason }, { status: 500 });
   }
 });

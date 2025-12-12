@@ -232,8 +232,7 @@ export default function SyncControlScreen() {
         </>
       )}
 
-      {
-      /* LAST RESULT CARD 
+      { /* LAST RESULT CARD */ }
       {lastResult && (
         <View
           style={{
@@ -261,8 +260,7 @@ export default function SyncControlScreen() {
           </View>
         </View>
       )}
-        */
-        }
+        
     </ScrollView>
   );
 }
