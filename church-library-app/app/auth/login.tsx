@@ -91,7 +91,7 @@ export default function LoginScreen() {
 
       // Redirect user
       if (user.role === "admin") {
-        router.replace("/admin");
+        router.replace("/");
       } else {
         router.replace("/");
       }

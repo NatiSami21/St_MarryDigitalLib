@@ -1,3 +1,4 @@
+// church-library-app/db/syncLog.ts
 import { db } from './sqlite';
 
 export const addSyncLog = async (log: {

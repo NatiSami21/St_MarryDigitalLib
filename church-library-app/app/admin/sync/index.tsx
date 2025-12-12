@@ -1,10 +1,22 @@
 // app/admin/sync/index.tsx
 
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { useRouter } from "expo-router";
 
-import { getSyncStatus, syncAll, pushPendingCommits, pullSnapshot } from "../../../lib/syncEngine";
+import {
+  getSyncStatus,
+  syncAll,
+  pushPendingCommits,
+  pullSnapshot,
+} from "../../../lib/syncEngine";
 import { getDeviceId } from "../../../db/queries/sync";
 
 export default function SyncControlScreen() {
@@ -14,6 +26,7 @@ export default function SyncControlScreen() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -28,10 +41,29 @@ export default function SyncControlScreen() {
     load();
   }, []);
 
+  /* ------------------------
+   * Helper for alerts
+   * -----------------------*/
+  const successToast = (msg: string) =>
+    Alert.alert("Success", msg, [{ text: "OK", style: "default" }]);
+
+  const errorToast = (msg: string) =>
+    Alert.alert("Error", msg, [{ text: "OK", style: "destructive" }]);
+
+  /* ------------------------
+   * SYNC HANDLERS
+   * -----------------------*/
   const handleSyncNow = async () => {
     setSyncing(true);
     const result = await syncAll();
     setLastResult(result);
+
+    if (result.success) {
+      successToast("Sync completed successfully!");
+    } else {
+      errorToast("Sync failed → Check server logs or try again.");
+    }
+
     await load();
     setSyncing(false);
   };
@@ -40,6 +72,13 @@ export default function SyncControlScreen() {
     setSyncing(true);
     const result = await pushPendingCommits();
     setLastResult({ push: result });
+
+    if (result.success) {
+      successToast(`Pushed ${result.pushedIds?.length ?? 0} commits`);
+    } else {
+      errorToast(result.message ?? "Push failed");
+    }
+
     await load();
     setSyncing(false);
   };
@@ -48,10 +87,20 @@ export default function SyncControlScreen() {
     setSyncing(true);
     const result = await pullSnapshot();
     setLastResult({ pull: result });
+
+    if (result.success) {
+      successToast("Pulled latest snapshot from server.");
+    } else {
+      errorToast(result.message ?? "Pull failed");
+    }
+
     await load();
     setSyncing(false);
   };
 
+  /* ------------------------
+   * LOADING STATE
+   * -----------------------*/
   if (loading || !syncInfo) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -59,6 +108,13 @@ export default function SyncControlScreen() {
       </View>
     );
   }
+
+  /* ------------------------
+   * Sync Health Colors
+   * -----------------------*/
+  const pending = syncInfo.pending;
+  const healthColor = pending === 0 ? "#16a34a" : pending < 10 ? "#eab308" : "#dc2626";
+  const healthLabel = pending === 0 ? "Healthy" : pending < 10 ? "Warning" : "Out of Sync";
 
   return (
     <ScrollView style={{ flex: 1, padding: 16, backgroundColor: "#f1f5f9" }}>
@@ -76,20 +132,33 @@ export default function SyncControlScreen() {
           elevation: 3,
         }}
       >
-        <Text style={{ fontSize: 18, fontWeight: "800", color: "#1e3a8a" }}>Sync Status</Text>
+        <Text style={{ fontSize: 18, fontWeight: "800", color: "#1e3a8a" }}>
+          Sync Status
+        </Text>
 
         <Text style={{ marginTop: 10, fontSize: 15 }}>
           Pending Commits:{" "}
-          <Text style={{ fontWeight: "700", color: syncInfo.pending > 0 ? "#dc2626" : "#16a34a" }}>
-            {syncInfo.pending}
-          </Text>
+          <Text style={{ fontWeight: "700", color: healthColor }}>{pending}</Text>
         </Text>
 
-        <Text style={{ marginTop: 6 }}>Last Push: {syncInfo.lastPush ?? "—"}</Text>
+        <Text style={{ marginTop: 4 }}>Last Push: {syncInfo.lastPush ?? "—"}</Text>
         <Text style={{ marginTop: 4 }}>Last Pull: {syncInfo.lastPull ?? "—"}</Text>
 
-        <Text style={{ marginTop: 6, color: "#64748b" }}>
-          Device ID: <Text style={{ fontWeight: "600" }}>{deviceId}</Text>
+        <View
+          style={{
+            marginTop: 8,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            backgroundColor: healthColor + "22",
+            borderRadius: 8,
+            alignSelf: "flex-start",
+          }}
+        >
+          <Text style={{ fontWeight: "600", color: healthColor }}>Status: {healthLabel}</Text>
+        </View>
+
+        <Text style={{ marginTop: 10, color: "#64748b" }}>
+          Device ID: <Text style={{ fontWeight: "700" }}>{deviceId}</Text>
         </Text>
       </View>
 
@@ -109,44 +178,62 @@ export default function SyncControlScreen() {
         </Text>
       </TouchableOpacity>
 
-      {/* DEV TOOLS SECTION */}
-      <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 10, color: "#1e293b" }}>
-        Developer Tools
-      </Text>
-
-      {/* PUSH ONLY */}
+      {/* ADVANCED TOGGLE */}
       <TouchableOpacity
-        onPress={handlePushOnly}
-        disabled={syncing}
+        onPress={() => setShowAdvanced(!showAdvanced)}
         style={{
-          backgroundColor: "#0ea5e9",
-          padding: 14,
-          borderRadius: 10,
-          marginBottom: 12,
+          backgroundColor: "#cbd5e1",
+          padding: 10,
+          borderRadius: 8,
+          marginBottom: 10,
         }}
       >
-        <Text style={{ color: "white", textAlign: "center", fontWeight: "700" }}>
-          Push Pending Only
+        <Text style={{ textAlign: "center", fontWeight: "600" }}>
+          {showAdvanced ? "Hide Advanced Tools ▲" : "Show Advanced Tools ▼"}
         </Text>
       </TouchableOpacity>
 
-      {/* PULL ONLY */}
-      <TouchableOpacity
-        onPress={handlePullOnly}
-        disabled={syncing}
-        style={{
-          backgroundColor: "#10b981",
-          padding: 14,
-          borderRadius: 10,
-          marginBottom: 20,
-        }}
-      >
-        <Text style={{ color: "white", textAlign: "center", fontWeight: "700" }}>
-          Pull From Server Only
-        </Text>
-      </TouchableOpacity>
+      {/* ADVANCED CONTROLS */}
+      {showAdvanced && (
+        <>
+          <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 10, color: "#1e293b" }}>
+            Developer Tools
+          </Text>
 
-      {/* LAST RESULT */}
+          <TouchableOpacity
+            onPress={handlePushOnly}
+            disabled={syncing}
+            style={{
+              backgroundColor: "#0ea5e9",
+              padding: 14,
+              borderRadius: 10,
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: "white", textAlign: "center", fontWeight: "700" }}>
+              Push Pending Only
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handlePullOnly}
+            disabled={syncing}
+            style={{
+              backgroundColor: "#10b981",
+              padding: 14,
+              borderRadius: 10,
+              marginBottom: 20,
+            }}
+          >
+            <Text style={{ color: "white", textAlign: "center", fontWeight: "700" }}>
+              Pull From Server Only
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      {
+      /* LAST RESULT CARD 
       {lastResult && (
         <View
           style={{
@@ -161,11 +248,21 @@ export default function SyncControlScreen() {
             Last Sync Result
           </Text>
 
-          <Text style={{ fontFamily: "monospace", color: "#334155" }}>
-            {JSON.stringify(lastResult, null, 2)}
-          </Text>
+          <View
+            style={{
+              backgroundColor: "#f8fafc",
+              padding: 10,
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: "#334155", fontFamily: "monospace" }}>
+              {JSON.stringify(lastResult, null, 2)}
+            </Text>
+          </View>
         </View>
       )}
+        */
+        }
     </ScrollView>
   );
 }
