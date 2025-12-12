@@ -1,166 +1,205 @@
-// ============================================================
-//  AUTH-ACTIVATE EDGE FUNCTION  (FINAL PATCHED VERSION)
-// ============================================================
+// supabase/functions/auth-activate/index.ts
+// Patched, tolerant, debug-friendly auth-activate for Supabase Edge Functions
 
-// ✔ Only valid imports for Supabase Edge Runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-// ============================================================
-//  CREATE SUPABASE CLIENT (SERVICE ROLE)
-// ============================================================
+/**
+ * NOTE:
+ * - Put DEPLOY_DEBUG=true in function env when debugging locally / on staging.
+ * - Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in function env.
+ */
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const DEBUG = (Deno.env.get("DEPLOY_DEBUG") || "").toLowerCase() === "true";
 
-const supabase = createClient(supabaseUrl, serviceKey);
-
-// ============================================================
-//  SHA-256 HASH (salt:pin)
-// ============================================================
-
-async function sha256(input: string) {
-  const data = new TextEncoder().encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment!");
+  // We still continue — createClient will fail later and be visible in logs.
 }
 
-// ============================================================
-//  MAIN HANDLER
-// ============================================================
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-serve(async (req: Request) => {
-  try {
-    const body = await req.json();
-    const { username, pin, device_id } = body;
+/**
+ * Compute SHA-256 digest and return both hex and base64 representations.
+ */
+async function sha256Both(input: string) {
+  const enc = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", enc);
+  const bytes = new Uint8Array(hashBuffer);
 
-    // Basic validation
-    if (!username || !pin || !device_id) {
-      return jsonError("Missing required fields", 400);
-    }
+  // hex
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 
-    // ------------------------------------------------------------
-    // 1. Fetch librarian
-    // ------------------------------------------------------------
-    const { data: librarian, error: libErr } = await supabase
-      .from("librarians")
-      .select("*")
-      .eq("username", username)
-      .single();
-
-    if (libErr || !librarian) {
-      return jsonError("Invalid username", 400);
-    }
-
-    // ------------------------------------------------------------
-    // 2. Verify PIN using SHA-256(salt:pin)
-    // ------------------------------------------------------------
-    const expectedHash = await sha256(`${librarian.pin_salt}:${pin}`);
-
-    if (expectedHash !== librarian.pin_hash) {
-      return jsonError("Incorrect PIN", 401);
-    }
-
-    // ------------------------------------------------------------
-    // 3. Determine if user must change PIN
-    //
-    // REQUIREMENT:
-    //   A boolean field "require_pin_change" must be in DB.
-    //   - true  → force change now
-    //   - false → normal login
-    // ------------------------------------------------------------
-    const require_pin_change = librarian.require_pin_change === true;
-
-    // ------------------------------------------------------------
-    // 4. Bind device to librarian (trust non-admin accounts too)
-    // ------------------------------------------------------------
-
-    await supabase
-      .from("librarians")
-      .update({
-        device_id: device_id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("username", username);
-
-    // ------------------------------------------------------------
-    // 5. Build full database snapshot
-    // ------------------------------------------------------------
-    const snapshot = await buildSnapshot();
-
-    // ------------------------------------------------------------
-    // 6. Return success response
-    // ------------------------------------------------------------
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        snapshot,
-        role: librarian.role,
-        require_pin_change,
-        last_pulled_commit: null,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-  } catch (err) {
-    console.error("AUTH ACTIVATE ERROR:", err);
-    return jsonError("Server error", 500);
+  // base64
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
-});
+  const base64 = btoa(binary);
 
-// ============================================================
-//  BUILD SNAPSHOT (clean & correct)
-// ============================================================
-
-async function buildSnapshot() {
-  const snapshot: Record<string, any[]> = {};
-
-  const tables = [
-    "users",
-    "books",
-    "librarians",
-    "transactions",
-    "commits",
-  ];
-
-  for (const t of tables) {
-    const { data, error } = await supabase.from(t).select("*");
-
-    if (error) {
-      console.error(`SNAPSHOT ERROR on table ${t}`, error);
-      snapshot[t] = [];
-    } else {
-      snapshot[t] = data ?? [];
-    }
-  }
-
-  // ---- SHIFTS (only non-deleted) ----
-  const { data: shiftData, error: shiftErr } = await supabase
-    .from("shifts")
-    .select("*")
-    .eq("deleted", 0);
-
-  if (shiftErr) {
-    console.error("SHIFT FETCH ERROR:", shiftErr);
-    snapshot["shifts"] = [];
-  } else {
-    snapshot["shifts"] = shiftData ?? [];
-  }
-
-  return snapshot;
+  return { hex, base64 };
 }
 
-// ============================================================
-//  JSON ERROR RESPONSE HELPER
-// ============================================================
-
-function jsonError(message: string, status = 400) {
-  return new Response(JSON.stringify({ ok: false, reason: message }), {
+function jsonError(msg: string, status = 400) {
+  return new Response(JSON.stringify({ ok: false, reason: msg }), {
     status,
     headers: { "Content-Type": "application/json" },
   });
 }
+
+serve(async (req: Request) => {
+  try {
+    // Parse body (robust)
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (e) {
+      if (DEBUG) console.error("Request JSON parse error:", e);
+      return jsonError("Invalid JSON body", 400);
+    }
+
+    const rawUsername = (body?.username ?? "").toString();
+    const pin = (body?.pin ?? "").toString();
+    const device_id = (body?.device_id ?? "").toString();
+
+    if (!rawUsername || !pin || !device_id) {
+      if (DEBUG) console.warn("Missing fields", { rawUsername, hasPin: !!pin, device_id });
+      return jsonError("Missing required fields", 400);
+    }
+
+    const usernameTrimmed = rawUsername.trim();
+
+    if (DEBUG) console.log(`Activate request for username='${usernameTrimmed}' device='${device_id}'`);
+
+    // 1) Try exact username lookup
+    let { data: librarian, error: libErr } = await supabase
+      .from("librarians")
+      .select("*")
+      .eq("username", usernameTrimmed)
+      .maybeSingle();
+
+    // 2) fallback: case-insensitive search (ilike)
+    if (!librarian) {
+      const { data: ciData, error: ciErr } = await supabase
+        .from("librarians")
+        .select("*")
+        .ilike("username", usernameTrimmed)
+        .limit(1);
+
+      if (ciErr) {
+        if (DEBUG) console.error("Case-insensitive username lookup error:", ciErr);
+      } else if (Array.isArray(ciData) && ciData.length > 0) {
+        librarian = ciData[0];
+        if (DEBUG) console.log("Found librarian via ilike fallback:", librarian.username);
+      }
+    }
+
+    if (!librarian) {
+      if (DEBUG) console.warn("Librarian not found for username:", usernameTrimmed);
+      return jsonError("Invalid username", 400);
+    }
+
+    // Normalize stored values
+    const storedSaltRaw = (librarian.pin_salt ?? "").toString().trim();
+    const storedHashRaw = (librarian.pin_hash ?? "").toString().trim();
+
+    if (!storedSaltRaw || !storedHashRaw) {
+      if (DEBUG) console.warn("Stored salt/hash missing for user:", librarian.username);
+      // choose to return 401 to indicate credentials can't be verified
+      return jsonError("Incorrect PIN", 401);
+    }
+
+    // Compute digest of `${salt}:${pin}` in both hex and base64
+    const computed = await sha256Both(`${storedSaltRaw}:${pin}`);
+
+    const computedHex = computed.hex.toLowerCase();
+    const computedB64 = computed.base64;
+
+    const storedHashNormalized = storedHashRaw.toLowerCase();
+
+    if (DEBUG) {
+      console.log("salt (db):", storedSaltRaw);
+      console.log("computedHex:", computedHex);
+      console.log("computedBase64:", computedB64);
+      console.log("storedHash (normalized):", storedHashNormalized);
+    }
+
+    // Comparison tolerant to hex vs base64, casing and whitespace
+    const matches =
+      storedHashNormalized === computedHex ||
+      storedHashNormalized === computedB64.toLowerCase();
+
+    if (!matches) {
+      if (DEBUG) {
+        console.warn("PIN verification failed for user:", librarian.username);
+      }
+      return jsonError("Incorrect PIN", 401);
+    }
+
+    // Determine require_pin_change (if you prefer field vs sentinel values)
+    // Accept either explicit boolean field 'require_pin_change' or legacy logic: empty hash/salt => require
+    let require_pin_change = false;
+    if (typeof librarian.require_pin_change === "boolean") {
+      require_pin_change = librarian.require_pin_change;
+    } else {
+      // legacy fallback
+      require_pin_change = storedHashRaw === "" || storedSaltRaw === "";
+    }
+
+    // Bind device_id (update DB)
+    try {
+      const { error: updErr } = await supabase
+        .from("librarians")
+        .update({ device_id, updated_at: new Date().toISOString() })
+        .eq("username", librarian.username);
+
+      if (updErr) {
+        if (DEBUG) console.error("Device bind update error:", updErr);
+        // not fatal; continue
+      } else if (DEBUG) {
+        console.log(`Bound device ${device_id} to ${librarian.username}`);
+      }
+    } catch (e) {
+      if (DEBUG) console.error("Device bind exception:", e);
+    }
+
+    // Build snapshot
+    const snapshot: Record<string, any[]> = {};
+    const tables = ["users", "books", "librarians", "transactions", "commits", "shifts"];
+    for (const t of tables) {
+      try {
+        const { data, error } = await supabase.from(t).select("*");
+        if (error) {
+          if (DEBUG) console.error(`Snapshot fetch error for ${t}:`, error);
+          snapshot[t] = [];
+        } else {
+          snapshot[t] = data ?? [];
+        }
+      } catch (e) {
+        if (DEBUG) console.error(`Snapshot exception for ${t}:`, e);
+        snapshot[t] = [];
+      }
+    }
+
+    // Success response
+    const resp = {
+      ok: true,
+      snapshot,
+      role: librarian.role ?? "librarian",
+      require_pin_change,
+      last_pulled_commit: null,
+    };
+
+    if (DEBUG) console.log("Activation success for", librarian.username);
+
+    return new Response(JSON.stringify(resp), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("AUTH-ACTIVATE unexpected error:", err);
+    return jsonError("Server error", 500);
+  }
+});
