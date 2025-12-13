@@ -29,6 +29,7 @@ export async function runMigrations() {
     try { db.execSync(`ALTER TABLE librarians ADD COLUMN updated_at TEXT;`); } catch {}
     try { db.execSync(`ALTER TABLE librarians ADD COLUMN device_id TEXT;`); } catch {}
     try { db.execSync(`ALTER TABLE librarians ADD COLUMN deleted INTEGER DEFAULT 0;`); } catch {}
+    try { db.execSync(`ALTER TABLE librarians ADD COLUMN require_pin_change INTEGER DEFAULT 0;`); } catch {}
 
     // -----------------------------
     // 2. COMMITS TABLE

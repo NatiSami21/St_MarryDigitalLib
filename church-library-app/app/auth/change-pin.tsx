@@ -1,8 +1,11 @@
+// app/auth/change-pin.tsx
+
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { getOneAsync, runAsync } from "../../db/sqlite";
-import { generateSalt, hashPin, verifyPinHash } from "../../lib/authUtils";
+import { getMetaValue } from "../../db/queries/meta";
+import { postChangePin } from "../../lib/network";
+
 
 export default function ChangePinScreen() {
   const router = useRouter();
@@ -26,36 +29,21 @@ export default function ChangePinScreen() {
       return;
     }
 
-    const record = await getOneAsync<{ pin_salt: string; pin_hash: string }>(
-      `SELECT pin_salt, pin_hash FROM librarians WHERE username = ?`,
-      [usernameParam]
-    );
-
-    if (!record) {
-      Alert.alert("Error", "User not found.");
-      return;
-    }
-
-    const isValidOld = await verifyPinHash(
-      oldPin.trim(),
-      record.pin_salt ?? "",
-      record.pin_hash ?? ""
-    );
-
-    if (!isValidOld) {
-      Alert.alert("Invalid PIN", "Old/temporary PIN is incorrect.");
-      return;
-    }
-
     setLoading(true);
     try {
-      const salt = generateSalt();
-      const hash = await hashPin(newPin, salt);
+      const deviceId = await getMetaValue("device_id");
 
-      await runAsync(
-        `UPDATE librarians SET pin_salt = ?, pin_hash = ?, updated_at = ? WHERE username = ?`,
-        [salt, hash, new Date().toISOString(), usernameParam]
-      );
+      const res = await postChangePin({
+        username: usernameParam,
+        old_pin: oldPin,
+        new_pin: newPin,
+        device_id: deviceId!,
+      });
+
+      if (!res.ok) {
+        Alert.alert("Error", res.reason || "PIN change failed");
+        return;
+      }
 
       Alert.alert("Success", "PIN changed successfully.", [
         { text: "OK", onPress: () => router.replace(nextRoute as any) }

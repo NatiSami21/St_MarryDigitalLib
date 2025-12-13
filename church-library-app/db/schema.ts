@@ -67,7 +67,8 @@ export const createLibrariansTable = `
     pin_hash TEXT,
     created_at TEXT,
     updated_at TEXT,
-    deleted INTEGER DEFAULT 0
+    deleted INTEGER DEFAULT 0,
+    require_pin_change INTEGER DEFAULT 0
   );
 `;
 

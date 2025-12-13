@@ -123,3 +123,19 @@ function mockSnapshot(librariansOverride?: any[]) {
     commits: [],
   };
 }
+
+export async function postChangePin(payload: {
+  username: string;
+  old_pin: string;
+  new_pin: string;
+  device_id: string;
+}) {
+  const base = cleanBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
+  const res = await fetch(`${base}/auth-change-pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  return await res.json();
+}

@@ -14,6 +14,7 @@ export interface Librarian {
   pin_salt: string | null;
   pin_hash: string | null;
   deleted: number;
+  require_pin_change: boolean;
 }
 
 

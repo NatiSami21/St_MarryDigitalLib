@@ -67,6 +67,14 @@ export default function LoginScreen() {
         return;
       }
 
+      if (user.require_pin_change) {
+        router.replace({
+          pathname: "/auth/change-pin",
+          params: { username: user.username }
+        });
+        return;
+      }
+
       // SHIFT CHECK — admin bypasses
       if (user.role === "librarian") {
         const allowed = await isInsideShift(user.username);

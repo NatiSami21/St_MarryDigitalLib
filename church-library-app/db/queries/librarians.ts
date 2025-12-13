@@ -12,6 +12,7 @@ export interface Librarian {
   device_id: string | null;
   pin_hash: string | null;
   deleted: number;
+  require_pin_change: boolean;
 }
 
 export async function getAllLibrarians(): Promise<Librarian[]> {
