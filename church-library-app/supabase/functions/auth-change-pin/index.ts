@@ -34,9 +34,13 @@ serve(async (req) => {
     }
 
     // verify old PIN (temporary)
-    const oldHash = await hashPin(old_pin, lib.pin_salt);
-    if (oldHash !== lib.pin_hash) {
-      return Response.json({ ok: false, reason: "invalid_old_pin" });
+    if (lib.require_pin_change === true) {
+      // Allow PIN change without old_pin (activation flow)
+    } else {
+      const oldHash = await hashPin(old_pin, lib.pin_salt);
+      if (oldHash !== lib.pin_hash) {
+        return Response.json({ ok: false, reason: "invalid_old_pin" });
+      }
     }
 
     const salt = crypto.randomUUID().replace(/-/g, "").slice(0, 32);

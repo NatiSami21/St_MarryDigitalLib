@@ -91,14 +91,28 @@ export default function ManageLibrarians() {
           style: "destructive",
           onPress: async () => {
             const salt = generateSalt();
-            const newPin = "4567"; // temporary PIN
+            const newPin = Math.floor(1000 + Math.random() * 9000).toString(); // PATCH 1
             const hash = await hashPin(newPin, salt);
 
-            await updateLibrarianPin(lib.id, salt, hash);
+            // PATCH 2: Update local DB and set require_pin_change
+            await updateLibrarianPin(lib.id, salt, hash, true);
+
+            // PATCH 3: Sync to cloud
+            const API_BASE =
+              process.env.EXPO_PUBLIC_API_BASE_URL || "";
+
+            await fetch(`${API_BASE}/auth-admin-reset-pin`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username: lib.username,
+                new_pin: newPin
+              }),
+            });
 
             Alert.alert(
               "PIN Reset",
-              `Temporary PIN for ${lib.full_name} is: 4567\nAsk them to change it on next login.`
+              `Temporary PIN for ${lib.full_name} is: ${newPin}\nAsk them to change it on next login.`
             );
           },
         },

@@ -139,23 +139,7 @@ serve(async (req: Request) => {
     }
 
     // Determine require_pin_change
-    // Default admin "DiguwaSoft" MUST change PIN on first login
-    // Newly created admins/librarians SHOULD also change PIN
-    let require_pin_change = false;
-    
-    if (typeof librarian.require_pin_change === "boolean") {
-      // Use the explicit boolean field if it exists
-      require_pin_change = librarian.require_pin_change;
-    } else {
-      // Logic for default admin: If username is DiguwaSoft and role is admin, require PIN change
-      if (librarian.username === "DiguwaSoft" && librarian.role === "admin") {
-        require_pin_change = true;
-        if (DEBUG) console.log("Default admin detected, requiring PIN change");
-      } else {
-        // Legacy fallback for other users: require PIN change if hash/salt is empty
-        require_pin_change = storedHashRaw === "" || storedSaltRaw === "";
-      }
-    }
+    const require_pin_change = Boolean(librarian.require_pin_change); // PATCH: authoritative
 
     // Bind device_id (update DB)
     try {

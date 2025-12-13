@@ -92,14 +92,15 @@ export async function unbindLibrarianDevice(id: number) {
 export async function updateLibrarianPin(
   id: number,
   pin_salt: string,
-  pin_hash: string
+  pin_hash: string,
+  require_pin_change: boolean = false // PATCH: add param
 ) {
   await db.runAsync(
-    `UPDATE librarians SET pin_salt = ?, pin_hash = ? WHERE id = ?`,
-    [pin_salt, pin_hash, id]
+    `UPDATE librarians SET pin_salt = ?, pin_hash = ?, require_pin_change = ? WHERE id = ?`, // PATCH: add require_pin_change
+    [pin_salt, pin_hash, require_pin_change ? 1 : 0, id]
   );
 
-  await addCommit("reset_pin", "librarians", { id, pin_salt, pin_hash });
+  await addCommit("reset_pin", "librarians", { id, pin_salt, pin_hash, require_pin_change }); // PATCH: log flag
 }
 
 export async function updateLibrarian(

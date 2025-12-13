@@ -84,8 +84,8 @@ export async function applySnapshot({
         await runAsync(
           `INSERT OR REPLACE INTO librarians
             (username, full_name, pin_salt, pin_hash, role,
-             device_id, created_at, updated_at, deleted)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             device_id, created_at, updated_at, deleted, require_pin_change)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, // PATCH: add column
           [
             l.username,
             l.full_name ?? l.username ?? "",
@@ -97,6 +97,7 @@ export async function applySnapshot({
             l.created_at ?? new Date().toISOString(),
             l.updated_at ?? new Date().toISOString(),
             l.deleted ?? 0,
+            l.require_pin_change ? 1 : 0 // PATCH: add value
           ]
         );
       }
