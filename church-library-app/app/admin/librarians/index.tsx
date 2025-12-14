@@ -42,6 +42,17 @@ export default function ManageLibrarians() {
   }, []);
 
   const onDelete = (lib: Librarian) => {
+    // 🚨 SAFETY: prevent deleting last admin
+    const adminCount = librarians.filter(l => l.role === "admin").length;
+
+    if (lib.role === "admin" && adminCount === 1) {
+      Alert.alert(
+        "Not allowed",
+        "You must keep at least one admin."
+      );
+      return;
+    }
+
     Alert.alert(
       "Delete Librarian",
       `Are you sure you want to delete "${lib.full_name}"?`,
@@ -55,7 +66,6 @@ export default function ManageLibrarians() {
               const API_BASE =
                 process.env.EXPO_PUBLIC_API_BASE_URL || "";
 
-              // 🔐 get admin identity
               const admin = await getCurrentAdminSession();
 
               const res = await fetch(
@@ -82,10 +92,7 @@ export default function ManageLibrarians() {
               await softDeleteLibrarian(lib.id);
               load();
 
-              Alert.alert("Deleted", `${lib.full_name} has been removed.`);
-
             } catch (e: any) {
-              console.error("Delete librarian error:", e);
               Alert.alert("Error", e.message ?? "Failed to delete librarian");
             }
           },
@@ -93,6 +100,7 @@ export default function ManageLibrarians() {
       ]
     );
   };
+
 
 
   const onUnbind = (lib: any) => {

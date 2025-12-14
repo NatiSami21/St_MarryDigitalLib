@@ -54,19 +54,18 @@ serve(async (req) => {
     // --------------------------------------------------
     // 3. Disable delete of last admin librarian
     // --------------------------------------------------
-    if (target.role === "admin") {
-      const { count, error } = await supabase
-        .from("librarians")
-        .select("username", { count: "exact", head: true })
-        .eq("role", "admin")
-        .eq("deleted", 0);
-        if (error) {
-            console.error("Count admins error:", error);
-            return jsonError("Server error", 500);
-        }
-        if (count !== null && count <= 1) {
-            return jsonError("Cannot delete last admin", 409);
-        }
+    // Count active admins
+    const { count: adminCount } = await supabase
+    .from("librarians")
+    .select("*", { count: "exact", head: true })
+    .eq("role", "admin")
+    .eq("deleted", 0);
+
+    if (target.role === "admin" && adminCount === 1) {
+    return Response.json(
+        { ok: false, reason: "Cannot delete the last admin" },
+        { status: 400 }
+    );
     }
     
 
