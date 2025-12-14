@@ -5,6 +5,9 @@ import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } fro
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { getMetaValue } from "../../db/queries/meta";
 import { postChangePin } from "../../lib/network";
+import { updateLibrarianPin } from "../../db/queries/librarians";
+import { generateSalt, hashPin } from "../../lib/authUtils";
+import { getLibrarianByUsername } from "../../db/queries/librarians";
 
 
 export default function ChangePinScreen() {
@@ -45,9 +48,24 @@ export default function ChangePinScreen() {
         return;
       }
 
+      // 🔒 PATCH 3 — update LOCAL DB to match cloud
+      const librarian = await getLibrarianByUsername(usernameParam);
+      if (librarian) {
+        const salt = generateSalt();
+        const hash = await hashPin(newPin, salt);
+
+        await updateLibrarianPin(
+          librarian.id,
+          salt,
+          hash,
+          false // require_pin_change = false
+        );
+      }
+
       Alert.alert("Success", "PIN changed successfully.", [
         { text: "OK", onPress: () => router.replace(nextRoute as any) }
       ]);
+
     } catch (err: any) {
       console.error("change-pin error:", err);
       Alert.alert("Error", "Failed to set new PIN.");

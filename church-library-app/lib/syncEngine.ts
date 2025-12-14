@@ -322,24 +322,36 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
     if (Array.isArray(snapshot.librarians)) {
       for (const L of snapshot.librarians) {
         await runAsync(
-          `INSERT INTO librarians (username, full_name, role, device_id, pin_salt, pin_hash, deleted)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(username) DO UPDATE SET
-             full_name=excluded.full_name,
-             role=excluded.role,
-             device_id=excluded.device_id,
-             pin_salt=excluded.pin_salt,
-             pin_hash=excluded.pin_hash,
-             deleted=excluded.deleted`,
+          `INSERT INTO librarians (
+            username,
+            full_name,
+            role,
+            device_id,
+            pin_salt,
+            pin_hash,
+            deleted,
+            require_pin_change
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(username) DO UPDATE SET
+            full_name=excluded.full_name,
+            role=excluded.role,
+            device_id=excluded.device_id,
+            pin_salt=excluded.pin_salt,
+            pin_hash=excluded.pin_hash,
+            deleted=excluded.deleted,
+            require_pin_change=excluded.require_pin_change`,
           [
             L.username,
             L.full_name ?? L.username,
             L.role ?? "librarian",
             L.device_id ?? null,
-            L.pin_salt ?? L.salt ?? null,
+            L.pin_salt ?? null,
             L.pin_hash ?? null,
             L.deleted ?? 0,
+            L.require_pin_change ? 1 : 0
           ]
+
         );
       }
     }

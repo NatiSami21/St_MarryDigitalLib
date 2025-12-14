@@ -56,8 +56,8 @@ export async function insertLibrarian(data: CreateLibrarianInput) {
   const { username, full_name, role, pin_salt, pin_hash } = data;
 
   await db.runAsync(
-    `INSERT INTO librarians (username, full_name, role, pin_salt, pin_hash, deleted)
-     VALUES (?, ?, ?, ?, ?, 0)`,
+    `INSERT INTO librarians (username, full_name, role, pin_salt, pin_hash, deleted, require_pin_change)
+     VALUES (?, ?, ?, ?, ?, 0, 1)`,
     [username, full_name, role, pin_salt, pin_hash]
   );
 
