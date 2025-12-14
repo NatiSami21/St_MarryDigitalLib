@@ -250,7 +250,7 @@ export async function pullSnapshot() {
 export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
   if (!snapshot) return false;
 
-  const tables = ["books", "users", "librarians", "transactions", "pending_commits"];
+  const tables = ["books", "users", "librarians", "transactions", "shifts", "pending_commits"];
   const hasAny = tables.some(
     (t) => Array.isArray(snapshot[t]) && snapshot[t].length > 0
   );
@@ -381,6 +381,39 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
         );
       }
     }
+
+    // SHIFTS
+    if (Array.isArray(snapshot.shifts)) {
+      for (const s of snapshot.shifts) {
+        await runAsync(
+          `INSERT INTO shifts (
+            id,
+            librarian_username,
+            date,
+            start_time,
+            end_time,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            date=excluded.date,
+            start_time=excluded.start_time,
+            end_time=excluded.end_time,
+            updated_at=excluded.updated_at`,
+          [
+            s.id,
+            s.librarian_username,
+            s.date,
+            s.start_time,
+            s.end_time,
+            s.created_at,
+            s.updated_at,
+          ]
+        );
+      }
+    }
+
 
     // PENDING COMMITS FROM SERVER
     if (Array.isArray(snapshot.pending_commits)) {

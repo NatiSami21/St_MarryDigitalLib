@@ -10,71 +10,150 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 interface PushCommit {
   commit_id: string;
   table_name: string;
-  action: string;   // insert | create | update | delete
+  action: "insert" | "create" | "update" | "delete";
   payload: any;
-  timestamp: string;
+  timestamp: number;
   librarian_username: string;
   device_id: string;
 }
 
+/* ---------------- APPLY COMMIT ---------------- */
+
 async function applyCommit(commit: PushCommit) {
   console.log("📦 APPLY COMMIT:", commit);
 
-  const { table_name, payload } = commit;
+  const { table_name } = commit;
+  let payload = commit.payload;
 
   // Normalize action
-  const action =
-    commit.action === "insert" ? "create" : commit.action;
+  const action = commit.action === "insert" ? "create" : commit.action;
 
-  // Ensure updated_at
+  // Ensure updated_at exists
   if (payload && !payload.updated_at) {
     payload.updated_at = new Date().toISOString();
   }
 
-  let result;
+  let result: any = null;
 
   switch (table_name) {
-    case "librarians":
-      if (action === "create") result = await supabase.from("librarians").insert(payload);
-      if (action === "update") result = await supabase.from("librarians").update(payload).eq("username", payload.username);
-      if (action === "delete") result = await supabase.from("librarians").delete().eq("username", payload.username);
-      break;
-
-    case "books":
-      if (action === "create") result = await supabase.from("books").insert(payload);
-      if (action === "update") result = await supabase.from("books").update(payload).eq("book_code", payload.book_code);
-      if (action === "delete") result = await supabase.from("books").delete().eq("book_code", payload.book_code);
-      break;
-
-    case "users":
-      if (action === "create") result = await supabase.from("users").insert(payload);
-      if (action === "update") result = await supabase.from("users").update(payload).eq("fayda_id", payload.fayda_id);
-      if (action === "delete") result = await supabase.from("users").delete().eq("fayda_id", payload.fayda_id);
-      break;
-
-    case "transactions":
-      if (action === "create") result = await supabase.from("transactions").insert(payload);
-      if (action === "update") result = await supabase.from("transactions").update(payload).eq("tx_id", payload.tx_id);
-      if (action === "delete") result = await supabase.from("transactions").delete().eq("tx_id", payload.tx_id);
-      break;
-    
-    case "shifts": {
-      const payloadFixed = { ...payload, created_at: new Date(payload.created_at).toISOString(), updated_at: new Date(payload.updated_at).toISOString(), };
-      if (action === "insert") result = await supabase.from("shifts").insert(payloadFixed);
-      if (action === "update") result = await supabase.from("shifts").update(payloadFixed).eq("id", payload.id);
+    /* ---------- LIBRARIANS ---------- */
+    case "librarians": {
+      if (action === "create") {
+        result = await supabase.from("librarians").insert(payload);
+      }
+      if (action === "update") {
+        result = await supabase
+          .from("librarians")
+          .update(payload)
+          .eq("username", payload.username);
+      }
+      if (action === "delete") {
+        result = await supabase
+          .from("librarians")
+          .delete()
+          .eq("username", payload.username);
+      }
       break;
     }
 
+    /* ---------- BOOKS ---------- */
+    case "books": {
+      if (action === "create") {
+        result = await supabase.from("books").insert(payload);
+      }
+      if (action === "update") {
+        result = await supabase
+          .from("books")
+          .update(payload)
+          .eq("book_code", payload.book_code);
+      }
+      if (action === "delete") {
+        result = await supabase
+          .from("books")
+          .delete()
+          .eq("book_code", payload.book_code);
+      }
+      break;
+    }
 
-    default:
-      console.log("❌ UNSUPPORTED TABLE:", table_name);
-      return { error: { message: `Unsupported table ${table_name}` } };
+    /* ---------- USERS ---------- */
+    case "users": {
+      if (action === "create") {
+        result = await supabase.from("users").insert(payload);
+      }
+      if (action === "update") {
+        result = await supabase
+          .from("users")
+          .update(payload)
+          .eq("fayda_id", payload.fayda_id);
+      }
+      if (action === "delete") {
+        result = await supabase
+          .from("users")
+          .delete()
+          .eq("fayda_id", payload.fayda_id);
+      }
+      break;
+    }
+
+    /* ---------- TRANSACTIONS ---------- */
+    case "transactions": {
+      if (action === "create") {
+        result = await supabase.from("transactions").insert(payload);
+      }
+      if (action === "update") {
+        result = await supabase
+          .from("transactions")
+          .update(payload)
+          .eq("tx_id", payload.tx_id);
+      }
+      if (action === "delete") {
+        result = await supabase
+          .from("transactions")
+          .delete()
+          .eq("tx_id", payload.tx_id);
+      }
+      break;
+    }
+
+    /* ---------- SHIFTS (CRITICAL FIX) ---------- */
+    case "shifts": {
+      const fixedPayload = {
+        ...payload,
+        created_at: new Date(payload.created_at).toISOString(),
+        updated_at: new Date(payload.updated_at).toISOString(),
+      };
+
+      if (action === "create") {
+        result = await supabase.from("shifts").insert(fixedPayload);
+      }
+
+      if (action === "update") {
+        result = await supabase
+          .from("shifts")
+          .update(fixedPayload)
+          .eq("id", payload.id);
+      }
+      break;
+    }
+
+    /* ---------- UNSUPPORTED ---------- */
+    default: {
+      console.error("❌ UNSUPPORTED TABLE:", table_name);
+      return { error: { message: `Unsupported table: ${table_name}` } };
+    }
   }
 
-  console.log("📝 SUPABASE RESULT:", result);
+  if (!result) {
+    console.warn("⚠️ NO SUPABASE OP EXECUTED FOR:", table_name);
+  } else {
+    console.log("📝 SUPABASE RESULT:", result);
+  }
 
   return result;
 }
+
+/* ---------------- HTTP HANDLER ---------------- */
 
 serve(async (req) => {
   try {
@@ -84,7 +163,10 @@ serve(async (req) => {
     const { device_id, librarian_username, commits } = body;
 
     if (!device_id || !librarian_username || !Array.isArray(commits)) {
-      return Response.json({ ok: false, reason: "Invalid payload" }, { status: 400 });
+      return Response.json(
+        { ok: false, reason: "Invalid payload" },
+        { status: 400 }
+      );
     }
 
     const { data: librarian } = await supabase
@@ -93,40 +175,46 @@ serve(async (req) => {
       .eq("username", librarian_username)
       .single();
 
-    if (!librarian)
-      return Response.json({ ok: false, reason: "User not found" }, { status: 404 });
- 
-    if (librarian.deleted === 1)
+    if (!librarian) {
+      return Response.json(
+        { ok: false, reason: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    if (librarian.deleted === 1) {
       return Response.json(
         { ok: false, reason: "User deleted" },
         { status: 403 }
       );
+    }
 
-    if (librarian.device_id !== device_id)
-      return Response.json({
-        ok: false,
-        reason: "Device not authorized",
-      }, { status: 403 });
+    if (librarian.device_id !== device_id) {
+      return Response.json(
+        { ok: false, reason: "Device not authorized" },
+        { status: 403 }
+      );
+    }
 
-    const applied = [];
+    const applied: any[] = [];
 
-    for (const c of commits) {
-      const r = await applyCommit(c);
+    for (const commit of commits) {
+      const result = await applyCommit(commit);
 
       await supabase.from("commits").insert({
-        commit_id: c.commit_id,
-        librarian_username: c.librarian_username,
-        device_id: c.device_id,
-        type: c.action,
-        payload: JSON.stringify(c.payload),
-        timestamp: c.timestamp,
-        pushed: r?.error ? 0 : 1,
+        commit_id: commit.commit_id,
+        librarian_username: commit.librarian_username,
+        device_id: commit.device_id,
+        type: commit.action,
+        payload: JSON.stringify(commit.payload),
+        timestamp: commit.timestamp,
+        pushed: result?.error ? 0 : 1,
       });
 
       applied.push({
-        commit_id: c.commit_id,
-        success: !r?.error,
-        error: r?.error?.message ?? null,
+        commit_id: commit.commit_id,
+        success: !result?.error,
+        error: result?.error?.message ?? null,
       });
     }
 
@@ -137,8 +225,10 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("❌ sync-push error:", error);
-    const reason = (error instanceof Error) ? error.message : String(error);
-    return Response.json({ ok: false, reason }, { status: 500 });
+    console.error("❌ sync-push fatal error:", error);
+    return Response.json(
+      { ok: false, reason: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
 });
