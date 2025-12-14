@@ -101,6 +101,13 @@ serve(async (req: Request) => {
       return jsonError("Invalid username", 400);
     }
 
+    // Check deleted status
+    if (librarian.deleted === 1) {
+      if (DEBUG) console.warn("Deleted librarian activation attempt:", librarian.username);
+      return jsonError("User deleted", 403);
+    }
+
+
     // Normalize stored values
     const storedSaltRaw = (librarian.pin_salt ?? "").toString().trim();
     const storedHashRaw = (librarian.pin_hash ?? "").toString().trim();

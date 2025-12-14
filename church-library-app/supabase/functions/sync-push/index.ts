@@ -87,9 +87,12 @@ serve(async (req) => {
 
     if (!librarian)
       return Response.json({ ok: false, reason: "User not found" }, { status: 404 });
-
+ 
     if (librarian.deleted === 1)
-      return Response.json({ ok: false, reason: "User deleted" }, { status: 403 });
+      return Response.json(
+        { ok: false, reason: "User deleted" },
+        { status: 403 }
+      );
 
     if (librarian.device_id !== device_id)
       return Response.json({
