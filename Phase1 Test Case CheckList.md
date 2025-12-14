@@ -27,38 +27,39 @@
 
 ## 2. New Admin Flow (Admin creates another admin)
 
-- [ ] **Preconditions:** Device A (DiguwaSoft admin), Device B fresh.
-- [ ] Device A: Admin → Manage Librarians → + Add Librarian.
-- [ ] Enter: `AdminTwo`, `Admin Two`, role `admin`.
-- [ ] UI shows temporary PIN.
-- [ ] DB check: local `librarians` row created.
-- [ ] Sync push from Device A → success log entry.
-- [ ] Server check: `librarians` table contains `AdminTwo`.
-- [ ] Device B: Fresh install → activate with `AdminTwo` and temp PIN.
-- [ ] Activation succeeds → snapshot applied, device bound.
-- [ ] PIN change enforced → change to new PIN.
-- [ ] Dashboard accessible.
+- [X] **Preconditions:** Device A (DiguwaSoft admin), Device B fresh.
+- [X] Device A: Admin → Manage Librarians → + Add Librarian.
+- [X] Enter: `AdminTwo`, `Admin Two`, role `admin`.
+- [X] UI shows temporary PIN.
+- [X] DB check: local `librarians` row created.
+- [X] Sync push from Device A → success log entry.
+- [X] Server check: `librarians` table contains `AdminTwo`.
+- [X] Device B: Fresh install → activate with `AdminTwo` and temp PIN.
+- [X] Activation succeeds → snapshot applied, device bound.
+- [X] PIN change enforced → change to new PIN.
+- [X] Dashboard accessible.
 
 **Edge Cases:**
 
-- [ ] Activation fails if Device A hasn’t pushed commits.
+- [X] Activation fails if Device A hasn’t pushed commits.
 
 ---
 
 ## 3. Day-to-Day Admin Flow
 
-- [ ] **Preconditions:** Device A (DiguwaSoft), Device B (AdminTwo) active.
-- [ ] Device A: Manage Librarians → select `AdminTwo` → Reset PIN.
-- [ ] Confirm reset → temp PIN shown, local commit created.
-- [ ] Sync push → server updated.
-- [ ] Device B: Login with new temp PIN → success, PIN change required.
-- [ ] Device A: Unbind `AdminTwo` device.
-- [ ] Server: `device_id` becomes NULL after sync.
-- [ ] View Sync Status on dashboard → shows pending count and timestamps.
+- [X] **Preconditions:** Device A (DiguwaSoft), Device B (AdminTwo) active.
+- [X] Device A: Manage Librarians → select `AdminTwo` → Reset PIN.
+- [X] Confirm reset → temp PIN shown, local commit created.
+- [X] Supabase row shows: require_pin_change = true, device_id = null
+- [X] Device B actions can't be syced to sever anymore
+- [X] Device B: Reactivate with new temp PIN → success, PIN change required.
+- [X] Device A: Unbind `AdminTwo` device.
+- [X] Server: `device_id` becomes NULL after sync.
+- [X] View Sync Status on dashboard → shows pending count and timestamps.
 
 **Edge Cases:**
 
-- [ ] Push failure → sync log records failure, UI alert.
+- [X] Push failure → sync log records failure, UI alert.
 
 ---
 
