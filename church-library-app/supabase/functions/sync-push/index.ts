@@ -58,11 +58,13 @@ async function applyCommit(commit: PushCommit) {
       if (action === "delete") result = await supabase.from("transactions").delete().eq("tx_id", payload.tx_id);
       break;
     
-    case "shifts":
-      if (action === "create") result = await supabase.from("shifts").insert(payload);
-      if (action === "update") result = await supabase.from("shifts").update(payload).eq("id", payload.id);
-      if (action === "delete") result = await supabase.from("shifts").update({ deleted: true }).eq("id", payload.id);
+    case "shifts": {
+      const payloadFixed = { ...payload, created_at: new Date(payload.created_at).toISOString(), updated_at: new Date(payload.updated_at).toISOString(), };
+      if (action === "insert") result = await supabase.from("shifts").insert(payloadFixed);
+      if (action === "update") result = await supabase.from("shifts").update(payloadFixed).eq("id", payload.id);
       break;
+    }
+
 
     default:
       console.log("❌ UNSUPPORTED TABLE:", table_name);
