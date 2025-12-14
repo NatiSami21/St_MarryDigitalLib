@@ -1,5 +1,7 @@
 // lib/session.ts
 import * as SecureStore from "expo-secure-store";
+import { db } from "../db/sqlite";
+
 
 export type SessionPayload = {
   username: string;
@@ -19,4 +21,23 @@ export async function getSession(): Promise<SessionPayload | null> {
 
 export async function clearSession(): Promise<void> {
   await SecureStore.deleteItemAsync("session");
+} 
+
+export async function getCurrentAdminSession() {
+  const row = await db.getFirstAsync<{
+    username: string;
+    device_id: string;
+    role: string;
+  }>(
+    `SELECT username, device_id, role
+     FROM librarians
+     WHERE device_id IS NOT NULL AND deleted = 0
+     LIMIT 1`
+  );
+
+  if (!row || row.role !== "admin") {
+    throw new Error("No active admin session");
+  }
+
+  return row;
 }

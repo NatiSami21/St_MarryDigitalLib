@@ -50,8 +50,30 @@ serve(async (req) => {
     if (target.deleted === 1)
       return jsonError("Already deleted", 409);
 
+    
     // --------------------------------------------------
-    // 3. Soft delete + revoke device
+    // 3. Disable delete of last admin librarian
+    // --------------------------------------------------
+    if (target.role === "admin") {
+      const { count, error } = await supabase
+        .from("librarians")
+        .select("username", { count: "exact", head: true })
+        .eq("role", "admin")
+        .eq("deleted", 0);
+        if (error) {
+            console.error("Count admins error:", error);
+            return jsonError("Server error", 500);
+        }
+        if (count !== null && count <= 1) {
+            return jsonError("Cannot delete last admin", 409);
+        }
+    }
+    
+
+
+
+    // --------------------------------------------------
+    // 4. Soft delete + revoke device
     // --------------------------------------------------
     const { error: updErr } = await supabase
       .from("librarians")
@@ -69,7 +91,7 @@ serve(async (req) => {
     }
 
     // --------------------------------------------------
-    // 4. Audit commit
+    // 5. Audit commit
     // --------------------------------------------------
     await supabase.from("commits").insert({
       commit_id: crypto.randomUUID(),

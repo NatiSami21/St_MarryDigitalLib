@@ -70,7 +70,7 @@ export async function softDeleteLibrarian(id: number) {
     [id]
   );
 
-  await addCommit("soft_delete", "librarians", { id });
+  //await addCommit("soft_delete", "librarians", { id }); // server already handled it
 }
 
 export async function getLibrarianCount() {

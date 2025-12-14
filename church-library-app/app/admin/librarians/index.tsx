@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { getAllLibrarians, softDeleteLibrarian, unbindLibrarianDevice } from "../../../db/queries/librarians";
 import { updateLibrarianPin } from "../../../db/queries/librarians";
 import { generateSalt, hashPin } from "../../../lib/authUtils";
+import { getCurrentAdminSession } from "../../../lib/session";
 
 export interface Librarian {
   id: number;
@@ -40,7 +41,7 @@ export default function ManageLibrarians() {
     load();
   }, []);
 
-  const onDelete = (lib: any) => {
+  const onDelete = (lib: Librarian) => {
     Alert.alert(
       "Delete Librarian",
       `Are you sure you want to delete "${lib.full_name}"?`,
@@ -50,13 +51,49 @@ export default function ManageLibrarians() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            await softDeleteLibrarian(lib.id);
-            load();
+            try {
+              const API_BASE =
+                process.env.EXPO_PUBLIC_API_BASE_URL || "";
+
+              // 🔐 get admin identity
+              const admin = await getCurrentAdminSession();
+
+              const res = await fetch(
+                `${API_BASE}/auth-admin-delete-librarian`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    admin_username: admin.username,
+                    device_id: admin.device_id,
+                    target_username: lib.username,
+                  }),
+                }
+              );
+
+              const json = await res.json();
+
+              if (!json.ok) {
+                Alert.alert("Delete failed", json.reason);
+                return;
+              }
+
+              // ✅ mirror server state locally
+              await softDeleteLibrarian(lib.id);
+              load();
+
+              Alert.alert("Deleted", `${lib.full_name} has been removed.`);
+
+            } catch (e: any) {
+              console.error("Delete librarian error:", e);
+              Alert.alert("Error", e.message ?? "Failed to delete librarian");
+            }
           },
         },
       ]
     );
   };
+
 
   const onUnbind = (lib: any) => {
     if (!lib.device_id) {
