@@ -1,4 +1,4 @@
-// supabase/functions/shared/shift.ts
+// supabase/functions/shift/index.ts
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
