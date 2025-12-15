@@ -1,4 +1,5 @@
 // db/queries/attendance.ts
+
 import { runAsync, getOneAsync, getAllAsync } from "../sqlite";
 import { addCommit } from "../commits";
 
@@ -8,103 +9,140 @@ export interface ShiftAttendance {
   librarian_username: string;
   clock_in: number | null;
   clock_out: number | null;
-  status: string | null; // 'not_started' | 'in_progress' | 'completed'
+  status: string | null; // on_time | late | completed
   synced: number; // 0 | 1
-  created_at?: number;
-  updated_at?: number;
 }
 
-/**
- * Get attendance record for a specific shift and librarian (returns null if none)
- */
+/* --------------------------------------------------
+ * Fetch helpers
+ * --------------------------------------------------*/
+
 export async function getAttendanceForShift(
   shift_id: number,
   username: string
 ): Promise<ShiftAttendance | null> {
   return await getOneAsync<ShiftAttendance>(
-    `SELECT * FROM shift_attendance WHERE shift_id = ? AND librarian_username = ? LIMIT 1`,
+    `SELECT * FROM shift_attendance
+     WHERE shift_id = ? AND librarian_username = ?
+     LIMIT 1`,
     [shift_id, username]
   );
 }
 
-/**
- * Get all attendance records for a given shift (useful for admin views)
- */
-export async function getAttendanceByShift(shift_id: number): Promise<ShiftAttendance[]> {
+export async function getAttendancesForUser(
+  username: string
+): Promise<ShiftAttendance[]> {
   return await getAllAsync<ShiftAttendance>(
-    `SELECT * FROM shift_attendance WHERE shift_id = ? ORDER BY id ASC`,
-    [shift_id]
-  );
-}
-
-/**
- * Get attendance history for a librarian (paginated/filtering can be added later)
- */
-export async function getAttendancesForUser(username: string): Promise<ShiftAttendance[]> {
-  return await getAllAsync<ShiftAttendance>(
-    `SELECT * FROM shift_attendance WHERE librarian_username = ? ORDER BY id DESC`,
+    `SELECT * FROM shift_attendance
+     WHERE librarian_username = ?
+     ORDER BY id DESC`,
     [username]
   );
 }
 
-/**
- * Create attendance row (only if not exists). Marks status = 'not_started'
- */
-export async function createAttendanceRecord(shift_id: number, username: string) {
-  // If already exists, do nothing
-  const existing = await getAttendanceForShift(shift_id, username);
-  if (existing) return existing;
+export async function getAttendanceByShift(
+  shift_id: number
+): Promise<ShiftAttendance[]> {
+  return await getAllAsync<ShiftAttendance>(
+    `SELECT * FROM shift_attendance
+     WHERE shift_id = ?
+     ORDER BY id ASC`,
+    [shift_id]
+  );
+}
 
-  const ts = Date.now();
+/* --------------------------------------------------
+ * Core writers
+ * --------------------------------------------------*/
+
+/**
+ * Ensure attendance row exists (NO clock-in here)
+ */
+export async function ensureAttendanceRow(
+  shift_id: number,
+  username: string
+): Promise<ShiftAttendance> {
+  let att = await getAttendanceForShift(shift_id, username);
+  if (att) return att;
 
   await runAsync(
-    `INSERT INTO shift_attendance (shift_id, librarian_username, clock_in, clock_out, status, synced)
+    `INSERT INTO shift_attendance
+      (shift_id, librarian_username, clock_in, clock_out, status, synced)
      VALUES (?, ?, NULL, NULL, 'not_started', 0)`,
     [shift_id, username]
   );
 
-  // add commit for sync engine
-  await addCommit("insert", "shift_attendance", { shift_id, librarian_username: username, created_at: ts });
+  await addCommit("insert", "shift_attendance", {
+    shift_id,
+    librarian_username: username,
+  });
 
-  return await getAttendanceForShift(shift_id, username);
+  const created = await getAttendanceForShift(shift_id, username);
+  if (!created) {
+    throw new Error("Failed to create attendance record");
+  }
+
+  return created;
 }
 
 /**
- * Clock in: set clock_in timestamp and status to 'in_progress'
+ * 🔐 IMPLICIT CLOCK-IN (used ONLY on login)
  */
-export async function clockIn(shift_id: number, username: string) {
-  const ts = Date.now();
+export async function implicitClockIn(
+  shift_id: number,
+  username: string,
+  shiftStartTs: number
+) {
+  const now = Date.now();
+
+  const att = await ensureAttendanceRow(shift_id, username);
+
+  // Prevent double clock-in
+  if (att.clock_in) return;
+
+  const status = now <= shiftStartTs ? "on_time" : "late";
 
   await runAsync(
     `UPDATE shift_attendance
-     SET clock_in = ?, status = 'in_progress'
+     SET clock_in = ?, status = ?
      WHERE shift_id = ? AND librarian_username = ?`,
-    [ts, shift_id, username]
+    [now, status, shift_id, username]
   );
 
   await addCommit("clock_in", "shift_attendance", {
     shift_id,
     librarian_username: username,
-    clock_in: ts,
+    clock_in: now,
+    status,
   });
 }
 
 /**
- * Clock out: set clock_out timestamp and status to 'completed'
+ * ⏱ AUTO CLOCK-OUT (used by shift end watcher)
  */
-export async function clockOut(shift_id: number, username: string) {
-  const ts = Date.now();
+export async function autoClockOut(
+  shift_id: number,
+  username: string
+) {
+  const now = Date.now();
+
+  const att = await getAttendanceForShift(shift_id, username);
+  if (!att) return;
+
+  // already clocked out → nothing to do
+  if (att.clock_out) return;
 
   await runAsync(
     `UPDATE shift_attendance
      SET clock_out = ?, status = 'completed'
      WHERE shift_id = ? AND librarian_username = ?`,
-    [ts, shift_id, username]
+    [now, shift_id, username]
   );
 
   await addCommit("clock_out", "shift_attendance", {
     shift_id,
     librarian_username: username,
-    clock_out: ts,
+    clock_out: now,
+    status: "completed",
   });
 }

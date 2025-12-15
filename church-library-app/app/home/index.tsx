@@ -180,6 +180,8 @@ export default function HomeDashboard() {
             { label: "Transactions", path: "/transactions", color: "#374151" },
             { label: "Print Report", path: "/reports", color: "#6e621cff" },
             { label: "Inventory", path: "/books/inventory", color: "#401c6eff" },
+            { label: "Shifts", path: "/librarian/shifts", color: "#7c3aed" },
+            { lable: "Attendance", path: "/librarian/shifts/history", color: "#d97706" },
           ].map((btn, i) => (
             <TouchableOpacity
               key={i}

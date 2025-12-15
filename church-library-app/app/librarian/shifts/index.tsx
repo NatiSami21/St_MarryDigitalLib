@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import { useRouter } from "expo-router";
 
 import { getSession } from "../../../lib/session";
 import { getShiftsByDate } from "../../../db/queries/shifts";
-import {
-  getAttendanceForShift,
-  createAttendanceRecord,
-  clockIn,
-  clockOut,
-} from "../../../db/queries/attendance";
+import { getAttendanceForShift } from "../../../db/queries/attendance";
 
 import { events } from "../../../utils/events";
 
@@ -40,24 +41,26 @@ export default function MyShiftsToday() {
       const today = new Date().toISOString().split("T")[0]; // yyyy-mm-dd
 
       const rows = await getShiftsByDate(today);
-      const myShifts = rows.filter((s) => s.librarian_username === session.username);
+      const myShifts = rows.filter(
+        (s) => s.librarian_username === session.username
+      );
+
       setShifts(myShifts);
 
-      const attMap: any = {};
+      const attMap: Record<number, any> = {};
+
       for (const shift of myShifts) {
-        let att = await getAttendanceForShift(shift.id, session.username);
+        const att = await getAttendanceForShift(
+          shift.id,
+          session.username
+        );
 
-        if (!att) {
-          await createAttendanceRecord(shift.id, session.username);
-          att = await getAttendanceForShift(shift.id, session.username);
-        }
-
-        attMap[shift.id] = att;
+        attMap[shift.id] = att; // may be null before login
       }
 
       setAttendanceMap(attMap);
     } catch (e) {
-      console.log("Shift load error:", e);
+      console.log("❌ Shift load error:", e);
     } finally {
       setLoading(false);
     }
@@ -72,18 +75,9 @@ export default function MyShiftsToday() {
     return () => sub.remove();
   }, []);
 
-  const doClockIn = async (shift_id: number) => {
-    if (!username) return;
-    await clockIn(shift_id, username);
-    events.emit("refresh-attendance");
-  };
-
-  const doClockOut = async (shift_id: number) => {
-    if (!username) return;
-    await clockOut(shift_id, username);
-    events.emit("refresh-attendance");
-  };
-
+  /* --------------------------------------------------
+   * UI Helpers
+   * --------------------------------------------------*/
   const StatusPill = ({ status }: { status: string | null }) => {
     let color = COLORS.info;
     let label = "Not Started";
@@ -92,6 +86,7 @@ export default function MyShiftsToday() {
       color = COLORS.warning;
       label = "In Progress";
     }
+
     if (status === "completed") {
       color = COLORS.success;
       label = "Completed";
@@ -134,52 +129,33 @@ export default function MyShiftsToday() {
         </Text>
 
         <View style={{ marginTop: 10 }}>
-          <StatusPill status={att?.status} />
+          <StatusPill status={att?.status ?? null} />
         </View>
 
-        {/* Clock-In Button */}
-        {!att?.clock_in && (
-          <TouchableOpacity
-            onPress={() => doClockIn(shift.id)}
-            style={{
-              backgroundColor: COLORS.purple,
-              paddingVertical: 14,
-              borderRadius: 10,
-              marginTop: 16,
-            }}
-          >
-            <Text style={{ color: "white", fontWeight: "800", textAlign: "center" }}>
-              Clock In
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Clock-Out Button */}
-        {att?.clock_in && !att?.clock_out && (
-          <TouchableOpacity
-            onPress={() => doClockOut(shift.id)}
-            style={{
-              backgroundColor: COLORS.danger,
-              paddingVertical: 14,
-              borderRadius: 10,
-              marginTop: 16,
-            }}
-          >
-            <Text style={{ color: "white", fontWeight: "800", textAlign: "center" }}>
-              Clock Out
-            </Text>
-          </TouchableOpacity>
+        {att?.clock_in && (
+          <Text style={{ marginTop: 10, color: "#475569" }}>
+            Clock In: {new Date(att.clock_in).toLocaleTimeString()}
+          </Text>
         )}
 
         {att?.clock_out && (
-          <Text style={{ color: COLORS.success, marginTop: 12, fontWeight: "700" }}>
-            Shift Completed
+          <Text
+            style={{
+              color: COLORS.success,
+              marginTop: 6,
+              fontWeight: "700",
+            }}
+          >
+            Clock Out: {new Date(att.clock_out).toLocaleTimeString()}
           </Text>
         )}
       </View>
     );
   };
 
+  /* --------------------------------------------------
+   * Render
+   * --------------------------------------------------*/
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -189,13 +165,24 @@ export default function MyShiftsToday() {
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#f1f5f9", padding: 20 }}>
-      <Text style={{ fontSize: 30, fontWeight: "900", color: "#1e3a8a", marginBottom: 10 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: "#f1f5f9", padding: 20 }}
+    >
+      <Text
+        style={{
+          fontSize: 30,
+          fontWeight: "900",
+          color: "#1e3a8a",
+          marginBottom: 10,
+        }}
+      >
         My Shifts Today
       </Text>
 
       {shifts.length === 0 && (
-        <Text style={{ color: "#475569", fontSize: 16 }}>No shifts scheduled for today.</Text>
+        <Text style={{ color: "#475569", fontSize: 16 }}>
+          No shifts scheduled for today.
+        </Text>
       )}
 
       {shifts.map((shift) => (
@@ -211,7 +198,13 @@ export default function MyShiftsToday() {
           marginTop: 24,
         }}
       >
-        <Text style={{ color: "white", fontWeight: "800", textAlign: "center" }}>
+        <Text
+          style={{
+            color: "white",
+            fontWeight: "800",
+            textAlign: "center",
+          }}
+        >
           View Attendance History
         </Text>
       </TouchableOpacity>

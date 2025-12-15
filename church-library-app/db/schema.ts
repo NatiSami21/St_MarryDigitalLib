@@ -128,6 +128,7 @@ export const createShiftAttendanceTable = `
     shift_id INTEGER NOT NULL,
     clock_in INTEGER,
     clock_out INTEGER,
+    late_minutes INTEGER DEFAULT 0,
     status TEXT,                     -- on_time / late / absent / incomplete
     synced INTEGER DEFAULT 0,
 

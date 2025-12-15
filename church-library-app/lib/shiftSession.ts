@@ -1,12 +1,18 @@
 // church-library-app/lib/shiftSession.ts
 
 import { Alert } from "react-native";
-import { clearSession } from "./session";
+import { clearSession, getSession } from "./session";
+
+import { autoClockOut } from "../db/queries/attendance";
+import { getActiveShift } from "../utils/shift";
 
 let logoutTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Schedule automatic logout when shift ends.
+ * Librarian only:
+ *  - auto clock-out (implicit)
+ *  - commit queued for sync
  */
 export function scheduleShiftLogout(
   shiftEndTime: number,
@@ -18,14 +24,16 @@ export function scheduleShiftLogout(
   const delay = shiftEndTime - now;
 
   if (delay <= 0) {
-    forceLogout("Your shift has ended.");
-    onLogout?.();
+    // Shift already ended
+    void handleForcedLogout("Your shift has ended.", onLogout);
     return;
   }
 
-  logoutTimer = setTimeout(() => {
-    forceLogout("Your shift has ended. You have been logged out.");
-    onLogout?.();
+  logoutTimer = setTimeout(async () => {
+    await handleForcedLogout(
+      "Your shift has ended. You have been logged out.",
+      onLogout
+    );
   }, delay);
 
   console.log(`⏱ Shift auto-logout scheduled in ${Math.round(delay / 1000)}s`);
@@ -42,9 +50,32 @@ export function clearShiftLogout() {
   }
 }
 
-async function forceLogout(message: string) {
-  console.log("🚪 Forced logout:", message);
-  await clearSession();
+/* --------------------------------------------------
+ * INTERNAL — forced logout handler
+ * --------------------------------------------------*/
+async function handleForcedLogout(
+  message: string,
+  onLogout?: () => void
+) {
+  try {
+    const session = await getSession();
 
-  Alert.alert("Session Ended", message, [{ text: "OK" }]);
+    // 🔐 Librarian auto clock-out (implicit)
+    if (session?.role === "librarian") {
+      const shift = await getActiveShift(session.username);
+
+      if (shift) {
+        // ✅ GUARANTEED COMMIT
+        await autoClockOut(shift.id, session.username);
+      }
+    }
+  } catch (err) {
+    console.error("Auto clock-out failed:", err);
+  } finally {
+    await clearSession();
+
+    Alert.alert("Session Ended", message, [{ text: "OK" }]);
+
+    onLogout?.();
+  }
 }

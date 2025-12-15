@@ -250,7 +250,7 @@ export async function pullSnapshot() {
 export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
   if (!snapshot) return false;
 
-  const tables = ["books", "users", "librarians", "transactions", "shifts", "pending_commits"];
+  const tables = ["books", "users", "librarians", "transactions", "shifts", "shift_attendance", "pending_commits"];
   const hasAny = tables.some(
     (t) => Array.isArray(snapshot[t]) && snapshot[t].length > 0
   );
@@ -413,6 +413,43 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
         );
       }
     }
+
+    // SHIFT ATTENDANCE
+    if (Array.isArray(snapshot.shift_attendance)) {
+      for (const a of snapshot.shift_attendance) {
+        await runAsync(
+          `INSERT INTO shift_attendance (
+            id,
+            shift_id,
+            librarian_username,
+            clock_in,
+            clock_out,
+            status,
+            created_at,
+            updated_at,
+            synced
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+          ON CONFLICT(id) DO UPDATE SET
+            clock_in=excluded.clock_in,
+            clock_out=excluded.clock_out,
+            status=excluded.status,
+            updated_at=excluded.updated_at,
+            synced=1`,
+          [
+            a.id,
+            a.shift_id,
+            a.librarian_username,
+            a.clock_in ?? null,
+            a.clock_out ?? null,
+            a.status ?? "not_started",
+            a.created_at ?? Date.now(),
+            a.updated_at ?? Date.now(),
+          ]
+        );
+      }
+    }
+
 
 
     // PENDING COMMITS FROM SERVER

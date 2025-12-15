@@ -10,7 +10,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 interface PushCommit {
   commit_id: string;
   table_name: string;
-  action: "insert" | "create" | "update" | "delete";
+  action: "insert" | "create" | "update" | "delete" | "clock_in" | "clock_out";
   payload: any;
   timestamp: number;
   librarian_username: string;
@@ -176,6 +176,43 @@ async function applyCommit(commit: PushCommit) {
       }
       break;
     }
+
+    /* ---------- SHIFT ATTENDANCE ---------- */
+    case "shift_attendance": {
+      if (action === "create") {
+        result = await supabase
+          .from("shift_attendance")
+          .insert(payload);
+      }
+
+      if (action === "clock_in") {
+        result = await supabase
+          .from("shift_attendance")
+          .update({
+            clock_in: payload.clock_in,
+            status: "in_progress",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("shift_id", payload.shift_id)
+          .eq("librarian_username", payload.librarian_username);
+      }
+
+      if (action === "clock_out") {
+        result = await supabase
+          .from("shift_attendance")
+          .update({
+            clock_out: payload.clock_out,
+            status: "completed",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("shift_id", payload.shift_id)
+          .eq("librarian_username", payload.librarian_username);
+      }
+
+      break;
+    }
+
+
 
     /* ---------- UNSUPPORTED ---------- */
     default: {

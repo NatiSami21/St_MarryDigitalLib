@@ -1,5 +1,3 @@
-// church-library-app/app/auth/login.tsx
-
 import React, { useState } from "react";
 import {
   View,
@@ -16,8 +14,9 @@ import { verifyPinHash } from "../../lib/authUtils";
 import { saveSession } from "../../lib/session";
 import { getMetaValue } from "../../db/queries/meta";
 
-import { isInsideShift, getShiftEndTime } from "../../utils/shift";
+import { getActiveShift } from "../../utils/shift";
 import { scheduleShiftLogout } from "../../lib/shiftSession";
+import { implicitClockIn } from "../../db/queries/attendance";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -33,7 +32,11 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+
     try {
+      /* --------------------------------------------------
+       * 1. Local user lookup
+       * --------------------------------------------------*/
       const user = await getLibrarianByUsername(username.trim());
 
       if (!user) {
@@ -41,7 +44,11 @@ export default function LoginScreen() {
         return;
       }
 
+      /* --------------------------------------------------
+       * 2. Device binding check
+       * --------------------------------------------------*/
       const deviceId = await getMetaValue("device_id");
+
       if (user.device_id && user.device_id !== deviceId) {
         Alert.alert(
           "Device Mismatch",
@@ -50,17 +57,23 @@ export default function LoginScreen() {
         return;
       }
 
-      const isValid = await verifyPinHash(
+      /* --------------------------------------------------
+       * 3. PIN verification
+       * --------------------------------------------------*/
+      const validPin = await verifyPinHash(
         pin.trim(),
         user.pin_salt ?? "",
         user.pin_hash ?? ""
       );
 
-      if (!isValid) {
+      if (!validPin) {
         Alert.alert("Invalid PIN", "Incorrect PIN.");
         return;
       }
 
+      /* --------------------------------------------------
+       * 4. Force PIN change if required
+       * --------------------------------------------------*/
       if (user.require_pin_change) {
         router.replace({
           pathname: "/auth/change-pin",
@@ -69,23 +82,26 @@ export default function LoginScreen() {
         return;
       }
 
-      // 🔐 SHIFT CHECK — admin bypass
-      let shiftEndTime: number | null = null;
+      /* --------------------------------------------------
+       * 5. Shift validation (LIBRARIAN ONLY)
+       * --------------------------------------------------*/
+      let activeShift: Awaited<ReturnType<typeof getActiveShift>> | null = null;
 
       if (user.role === "librarian") {
-        const allowed = await isInsideShift(user.username);
-        if (!allowed) {
+        activeShift = await getActiveShift(user.username);
+
+        if (!activeShift) {
           Alert.alert(
             "Access Denied",
             "❌ You are outside your scheduled shift time."
           );
           return;
         }
-
-        shiftEndTime = await getShiftEndTime(user.username);
       }
 
-      // Save session ONLY after all checks pass
+      /* --------------------------------------------------
+       * 6. Save session (after ALL checks)
+       * --------------------------------------------------*/
       await saveSession({
         username: user.username,
         role: user.role,
@@ -93,23 +109,43 @@ export default function LoginScreen() {
         device_id: deviceId,
       });
 
-      // ⏱ Schedule auto logout
-      if (shiftEndTime) {
-        scheduleShiftLogout(shiftEndTime, () => {
+      /* --------------------------------------------------
+       * 7. Implicit Attendance (LIBRARIAN ONLY)
+       * --------------------------------------------------*/
+      if (user.role === "librarian" && activeShift) {
+        await implicitClockIn(
+          activeShift.id,
+          user.username,
+          activeShift.startTs
+        );
+      }
+
+      /* --------------------------------------------------
+       * 8. Schedule auto logout at shift end
+       * --------------------------------------------------*/
+      if (user.role === "librarian" && activeShift) {
+        scheduleShiftLogout(activeShift.endTs, () => {
           router.replace("/auth/login");
         });
       }
 
+      /* --------------------------------------------------
+       * 9. Navigate
+       * --------------------------------------------------*/
       console.log("✅ Login successful:", user.username);
-      router.replace("/");
-    } catch (e) {
-      console.error("❌ Login error:", e);
+      router.replace(user.role === "admin" ? "/admin" : "/");
+
+    } catch (err) {
+      console.error("❌ Login error:", err);
       Alert.alert("Error", "Login failed.");
     } finally {
       setLoading(false);
     }
   };
 
+  /* --------------------------------------------------
+   * UI
+   * --------------------------------------------------*/
   return (
     <View
       style={{
@@ -147,6 +183,7 @@ export default function LoginScreen() {
           value={username}
           onChangeText={setUsername}
           autoCapitalize="none"
+          editable={!loading}
           style={{
             borderWidth: 1,
             borderColor: "#dbeafe",
@@ -163,6 +200,7 @@ export default function LoginScreen() {
           secureTextEntry
           keyboardType="numeric"
           maxLength={6}
+          editable={!loading}
           style={{
             borderWidth: 1,
             borderColor: "#dbeafe",
@@ -185,9 +223,7 @@ export default function LoginScreen() {
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text
-              style={{ color: "white", fontWeight: "700", fontSize: 16 }}
-            >
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
               Login
             </Text>
           )}
