@@ -27,16 +27,13 @@ async function isTimestampInsideShift(
   username: string,
   timestamp: number
 ): Promise<boolean> {
-  const date = new Date(timestamp);
-
-  const shiftDate = date.toISOString().slice(0, 10); // YYYY-MM-DD
-  const time = date.toTimeString().slice(0, 5); // HH:mm
+  const commitTime = new Date(timestamp).getTime();
 
   const { data: shifts, error } = await supabase
     .from("shifts")
-    .select("date, start_time, end_time")
+    .select("start_time, end_time")
     .eq("librarian_username", username)
-    .eq("date", shiftDate);
+    .eq("deleted", false);
 
   if (error) {
     console.error("❌ Shift query failed:", error);
@@ -48,16 +45,17 @@ async function isTimestampInsideShift(
   }
 
   for (const shift of shifts) {
-    if (
-      time >= shift.start_time &&
-      time <= shift.end_time
-    ) {
+    const start = new Date(shift.start_time).getTime();
+    const end = new Date(shift.end_time).getTime();
+
+    if (commitTime >= start && commitTime <= end) {
       return true;
     }
   }
 
   return false;
 }
+
 
 /* ---------------- APPLY COMMIT ---------------- */
 
@@ -251,6 +249,7 @@ serve(async (req) => {
     for (const commit of commits) {
       
       /* ---------- SERVER AUTHORITY SHIFT CHECK ---------- */
+      
       if (librarian.role === "librarian") {
         const valid = await isTimestampInsideShift(
           commit.librarian_username,
