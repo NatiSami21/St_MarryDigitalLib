@@ -16,6 +16,10 @@ import { getBook } from "../../db/books";
 import { borrowBook, getActiveBorrow } from "../../db/transactions";
 import { events } from "../../utils/events";
 
+import { getSession } from "../../lib/session";
+import { isInsideShift } from "../../utils/shift";
+
+
 function toStringParam(v: string | string[] | undefined): string {
   if (!v) return "";
   return Array.isArray(v) ? v[0] : v;
@@ -48,7 +52,35 @@ export default function ConfirmBorrow() {
     load();
   }, []);
 
+  const assertCanWrite = async (): Promise<boolean> => {
+    const session = await getSession();
+
+    if (!session) {
+      Alert.alert("Session Expired", "Please log in again.");
+      router.replace("/auth/login");
+      return false;
+    }
+
+    if (session.role === "admin") return true;
+
+    const allowed = await isInsideShift(session.username);
+    if (!allowed) {
+      Alert.alert(
+        "Action Blocked",
+        "❌ Your shift has ended. You cannot borrow books."
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+
   const handleConfirm = async () => {
+
+    const allowed = await assertCanWrite();
+    if (!allowed) return;
+
     if (!user || !book) return;
 
     setProcessing(true);

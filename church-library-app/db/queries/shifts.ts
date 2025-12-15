@@ -88,8 +88,8 @@ export async function updateShift(id: number, fields: Partial<Shift>) {
 }
 
 
-export async function getShiftsForLibrarian(username: string) {
-  return await db.getAllAsync(
+export async function getShiftsForLibrarian(username: string): Promise<Shift[]> {
+  return await db.getAllAsync<Shift>(
     `SELECT * FROM shifts 
      WHERE librarian_username = ? 
      AND deleted = 0`,

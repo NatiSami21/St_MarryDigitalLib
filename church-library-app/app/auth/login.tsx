@@ -1,4 +1,5 @@
-// app/auth/login.tsx
+// church-library-app/app/auth/login.tsx
+
 import React, { useState } from "react";
 import {
   View,
@@ -9,12 +10,14 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+
 import { getLibrarianByUsername } from "../../db/queries/librarians";
 import { verifyPinHash } from "../../lib/authUtils";
 import { saveSession } from "../../lib/session";
-import { getMetaValue } from "../../db/queries/meta"; 
-import { isInsideShift } from "../../utils/shift";
+import { getMetaValue } from "../../db/queries/meta";
 
+import { isInsideShift, getShiftEndTime } from "../../utils/shift";
+import { scheduleShiftLogout } from "../../lib/shiftSession";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -24,12 +27,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username.trim()) {
-      Alert.alert("Validation", "Enter your username.");
-      return;
-    }
-    if (!pin.trim()) {
-      Alert.alert("Validation", "Enter your PIN.");
+    if (!username.trim() || !pin.trim()) {
+      Alert.alert("Validation", "Enter username and PIN.");
       return;
     }
 
@@ -39,57 +38,54 @@ export default function LoginScreen() {
 
       if (!user) {
         Alert.alert("Not Found", "User not found on this device.");
-        setLoading(false);
         return;
       }
 
-      // Check device binding
       const deviceId = await getMetaValue("device_id");
       if (user.device_id && user.device_id !== deviceId) {
         Alert.alert(
           "Device Mismatch",
-          "This account is bound to a different device. Contact admin."
+          "This account is bound to a different device."
         );
-        setLoading(false);
         return;
       }
 
-      // Verify PIN
       const isValid = await verifyPinHash(
         pin.trim(),
         user.pin_salt ?? "",
         user.pin_hash ?? ""
       );
-      
+
       if (!isValid) {
         Alert.alert("Invalid PIN", "Incorrect PIN.");
-        setLoading(false);
         return;
       }
 
       if (user.require_pin_change) {
         router.replace({
           pathname: "/auth/change-pin",
-          params: { username: user.username }
+          params: { username: user.username },
         });
         return;
       }
 
-      // SHIFT CHECK — admin bypasses
+      // 🔐 SHIFT CHECK — admin bypass
+      let shiftEndTime: number | null = null;
+
       if (user.role === "librarian") {
         const allowed = await isInsideShift(user.username);
-
         if (!allowed) {
           Alert.alert(
             "Access Denied",
             "❌ You are outside your scheduled shift time."
           );
-          setLoading(false);
           return;
         }
+
+        shiftEndTime = await getShiftEndTime(user.username);
       }
 
-      // Save local session
+      // Save session ONLY after all checks pass
       await saveSession({
         username: user.username,
         role: user.role,
@@ -97,14 +93,17 @@ export default function LoginScreen() {
         device_id: deviceId,
       });
 
-      // Redirect user
-      if (user.role === "admin") {
-        router.replace("/");
-      } else {
-        router.replace("/");
+      // ⏱ Schedule auto logout
+      if (shiftEndTime) {
+        scheduleShiftLogout(shiftEndTime, () => {
+          router.replace("/auth/login");
+        });
       }
+
+      console.log("✅ Login successful:", user.username);
+      router.replace("/");
     } catch (e) {
-      console.error(e);
+      console.error("❌ Login error:", e);
       Alert.alert("Error", "Login failed.");
     } finally {
       setLoading(false);
@@ -112,9 +111,30 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={{ flex: 1, padding: 24, justifyContent: "center", backgroundColor: "#f8fafc" }}>
-      <View style={{ backgroundColor: "white", padding: 20, borderRadius: 14, elevation: 3 }}>
-        <Text style={{ fontSize: 26, fontWeight: "800", color: "#1e3a8a", marginBottom: 10 }}>
+    <View
+      style={{
+        flex: 1,
+        padding: 24,
+        justifyContent: "center",
+        backgroundColor: "#f8fafc",
+      }}
+    >
+      <View
+        style={{
+          backgroundColor: "white",
+          padding: 20,
+          borderRadius: 14,
+          elevation: 3,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 26,
+            fontWeight: "800",
+            color: "#1e3a8a",
+            marginBottom: 10,
+          }}
+        >
           Login
         </Text>
 
@@ -165,7 +185,11 @@ export default function LoginScreen() {
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>Login</Text>
+            <Text
+              style={{ color: "white", fontWeight: "700", fontSize: 16 }}
+            >
+              Login
+            </Text>
           )}
         </TouchableOpacity>
       </View>

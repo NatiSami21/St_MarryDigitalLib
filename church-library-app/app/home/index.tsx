@@ -12,11 +12,12 @@ import {
 import { useRouter } from "expo-router";
 
 import { getDashboardStats, DashboardStats } from "../../db/dashboard";
-import { getSession } from "../../lib/session";
+import { getSession, clearSession } from "../../lib/session";
 import { getLibrarianByUsername } from "../../db/queries/librarians";
 import { events } from "../../utils/events";
 
 import { syncAll, getSyncStatus } from "../../lib/syncEngine";
+ 
 
 export default function HomeDashboard() {
   const router = useRouter();
@@ -189,8 +190,38 @@ export default function HomeDashboard() {
             </TouchableOpacity>
           ))}
         </View>
-      </ScrollView>
 
+        {/* Logout Button */}
+        <View style={styles.logoutContainer}>
+          <View style={styles.logoutCard}>
+            <Text style={styles.logoutTitle}>Logout</Text>
+            <Text style={styles.logoutSubtitle}>Log out of admin session</Text>
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={async () => {
+                Alert.alert(
+                  "Logout",
+                  "Are you sure you want to logout?",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Logout",
+                      style: "destructive",
+                      onPress: async () => {
+                        await clearSession();
+                        router.replace("/auth/login");
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+      
       {/* FLOATING SYNC BUTTON */}
       <TouchableOpacity
         style={styles.fab}
@@ -265,7 +296,40 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "800",
   },
-
+  // Logout styles
+  logoutContainer: {
+    marginBottom: 40,
+  },
+  logoutCard: {
+    backgroundColor: "white",
+    padding: 18,
+    borderRadius: 12,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: "#b91c1c",
+  },
+  logoutTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#b91c1c",
+    marginBottom: 4,
+  },
+  logoutSubtitle: {
+    fontSize: 14,
+    color: "#6b7280",
+    marginBottom: 16,
+  },
+  logoutButton: {
+    backgroundColor: "#b91c1c",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  logoutButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "800",
+  },
   fab: {
     position: "absolute",
     bottom: 30,
@@ -280,4 +344,3 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
 });
-

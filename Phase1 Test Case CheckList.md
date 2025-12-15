@@ -65,26 +65,26 @@
 
 ## 4. New Librarian Added & Installed Flow
 
-- [ ] **Preconditions:** Shifts table ready, Device A admin, Device C fresh.
-- [ ] Device A: Add librarian `lib-new`.
-- [ ] Assign today’s shift to `lib-new`.
-- [ ] Sync push → server updated.
-- [ ] Device C: Activate with `lib-new` and temp PIN.
-- [ ] Activation success → shift saved locally, PIN change enforced.
-- [ ] Login during shift → allowed, librarian dashboard.
-- [ ] Log out, set time outside shift → login blocked.
+- [X] **Preconditions:** Shifts table ready, Device A admin, Device C fresh.
+- [X] Device A: Add librarian `lib-new`.
+- [X] Assign today’s shift to `lib-new`.
+- [X] Sync push → server updated.
+- [X] Device C: Activate with `lib-new` and temp PIN.
+- [X] Activation success → shift saved locally, PIN change enforced.
+- [X] Login during shift → allowed, librarian dashboard.
+- [X] Log out, set time outside shift → login blocked.
 
 **Edge Cases:**
 
-- [ ] Activation without shift → login blocked.
-- [ ] Shift not synced → activation still succeeds if snapshot includes shift.
+- [X] Activation without shift → login blocked.
+- [X] Shift not synced → activation still succeeds if snapshot includes shift.
 
 ---
 
 ## 5. Day-to-Day Librarian Flow
 
-- [ ] **Preconditions:** Librarian logged in during shift, books/users exist.
-- [ ] Login as `lib1` during shift → success.
+- [X] **Preconditions:** Librarian logged in during shift, books/users exist.
+- [X] Login as `lib1` during shift → success.
 - [ ] Borrow book: scan user `user-1`, book `book-1`.
 - [ ] Local `transactions` row created, sync pending.
 - [ ] Sync push → server updated, log success.

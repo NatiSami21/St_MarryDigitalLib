@@ -5,6 +5,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { getUser, updateUser } from "../../../db/users";
 import PhotoPicker from "../../../components/PhotoPicker";
 
+import { getSession } from "../../../lib/session";
+import { isInsideShift } from "../../../utils/shift";
+
+
 export default function EditUser() {
   const { fayda_id } = useLocalSearchParams();
   const router = useRouter();
@@ -20,6 +24,30 @@ export default function EditUser() {
   useEffect(() => {
     loadUser();
   }, []);
+
+  const assertCanWrite = async (): Promise<boolean> => {
+    const session = await getSession();
+
+    if (!session) {
+      Alert.alert("Session Expired", "Please log in again.");
+      router.replace("/auth/login");
+      return false;
+    }
+
+    if (session.role === "admin") return true;
+
+    const allowed = await isInsideShift(session.username);
+    if (!allowed) {
+      Alert.alert(
+        "Action Blocked",
+        "❌ Your shift has ended. You cannot edit users."
+      );
+      return false;
+    }
+
+    return true;
+  };
+
 
   const loadUser = async () => {
     try {
@@ -39,6 +67,9 @@ export default function EditUser() {
   };
 
   const handleSave = async () => {
+    const canWrite = await assertCanWrite();
+    if (!canWrite) return;
+    
     if (!name.trim()) {
       Alert.alert("Error", "Name is required.");
       return;

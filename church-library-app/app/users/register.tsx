@@ -7,6 +7,10 @@ import { upsertUser } from "../../db/users";
 
 import { events } from "../../utils/events";
 
+import { getSession } from "../../lib/session";
+import { isInsideShift } from "../../utils/shift";
+
+
 export default function RegisterUser() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -22,7 +26,34 @@ export default function RegisterUser() {
     if (params.fayda) setFaydaId(String(params.fayda));
   }, [params]);
 
+  const assertCanWrite = async (): Promise<boolean> => {
+    const session = await getSession();
+
+    if (!session) {
+      Alert.alert("Session Expired", "Please log in again.");
+      router.replace("/auth/login");
+      return false;
+    }
+
+    if (session.role === "admin") return true;
+
+    const allowed = await isInsideShift(session.username);
+    if (!allowed) {
+      Alert.alert(
+        "Action Blocked",
+        "❌ Your shift has ended. You cannot register users."
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+
   const handleSave = async () => {
+    const canWrite = await assertCanWrite();
+    if (!canWrite) return;
+    
     if (!name.trim()) return Alert.alert("Error", "Name is required");
     if (!faydaId.trim()) return Alert.alert("Error", "Fayda ID required");
 

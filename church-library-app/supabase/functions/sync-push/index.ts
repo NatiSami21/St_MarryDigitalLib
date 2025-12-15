@@ -3,6 +3,9 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { isTimestampInsideShift } from "../_shared/shift";
+
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -171,7 +174,7 @@ serve(async (req) => {
 
     const { data: librarian } = await supabase
       .from("librarians")
-      .select("device_id, deleted")
+      .select("device_id, deleted, role")
       .eq("username", librarian_username)
       .single();
 
@@ -199,6 +202,43 @@ serve(async (req) => {
     const applied: any[] = [];
 
     for (const commit of commits) {
+      
+      /* ---------- SERVER AUTHORITY SHIFT CHECK ---------- */
+      if (librarian.role === "librarian") {
+        const valid = await isTimestampInsideShift(
+          commit.librarian_username,
+          commit.timestamp
+        );
+
+        if (!valid) {
+          console.warn("⛔ COMMIT REJECTED (OUTSIDE SHIFT):", {
+            commit_id: commit.commit_id,
+            user: commit.librarian_username,
+            timestamp: commit.timestamp,
+          });
+
+          await supabase.from("commits").insert({
+            commit_id: commit.commit_id,
+            librarian_username: commit.librarian_username,
+            device_id: commit.device_id,
+            type: commit.action,
+            payload: JSON.stringify(commit.payload),
+            timestamp: commit.timestamp,
+            pushed: 0,
+            rejection_reason: "outside_shift_window",
+          });
+
+          applied.push({
+            commit_id: commit.commit_id,
+            success: false,
+            error: "Commit rejected: outside shift window",
+          });
+
+          continue;
+        }
+      }
+
+      /* ---------- APPLY COMMIT ---------- */
       const result = await applyCommit(commit);
 
       await supabase.from("commits").insert({

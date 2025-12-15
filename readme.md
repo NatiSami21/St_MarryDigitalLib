@@ -1,6 +1,4 @@
-
-
-**A digital Library platform project Proposal**
+**A digital Library platform project Proposal the running man, tron:ares**
 
 **Project Title : Developing Digital Library System (Offline-first Mobile App with Periodic Sync)**
 
@@ -8,11 +6,11 @@
 
 **Project lead  developer Info:**
 
-	**Name: Natinael Samuel (Bsc in SoftwareEngineering**
+    **Name: Natinael Samuel (Bsc in SoftwareEngineering**
 
-	**Phone: \+251904161978**
+    **Phone: \+251904161978**
 
-	**Email: [afritioalberts1216@gmail.com](mailto:afritioalberts1216@gmail.com)** 
+    **Email: [afritioalberts1216@gmail.com](mailto:afritioalberts1216@gmail.com)**
 
 **Portfolio: [https://natinael-samuel.netlify.app](https://natinael-samuel.netlify.app)**
 
@@ -20,17 +18,15 @@
 
 **Wolaita soddo, Ethiopia**
 
-### 
-
 ### 1\) Project Goal
 
-The goal of this project is to build a **low-cost, offline-first mobile app** for librarians that enables: 
+The goal of this project is to build a **low-cost, offline-first mobile app** for librarians that enables:
 
 \- Registering books and generating/printing QR labels.
 
  \- Registering users using the existing **Fayda National ID** (16-digit ID, barcode).
 
-\- Checking books in/out by scanning the user ID barcode \+ book QR (borrow) and scanning book QR (return). 
+\- Checking books in/out by scanning the user ID barcode \+ book QR (borrow) and scanning book QR (return).
 
 \- Storing all activity locally and syncing to a central online database when Wi-Fi is available (semi-automatic, e.g., every X hours).
 
@@ -40,15 +36,15 @@ The goal of this project is to build a **low-cost, offline-first mobile app** fo
 
 ### 2\) Success Criteria
 
-The project will be considered complete when: 
+The project will be considered complete when:
 
 \- Librarians can register books and produce QR labels.
 
- \- Librarians can register users with Fayda ID and identify users by scanning their Fayda barcode. 
+ \- Librarians can register users with Fayda ID and identify users by scanning their Fayda barcode.
 
-\- Borrow/return transactions work offline and sync reliably when internet is available. \- Reports are accessible within the app. 
+\- Borrow/return transactions work offline and sync reliably when internet is available. \- Reports are accessible within the app.
 
-\- Sync conflict handling prevents record corruption. 
+\- Sync conflict handling prevents record corruption.
 
 \- The app runs smoothly on **basic Android devices**.
 
@@ -57,21 +53,13 @@ The project will be considered complete when:
 ### 3\) Minimum Viable Product (MVP) Features
 
 * **Book registration form** (title, author, category, notes, unique ID).
-
 * **QR generation** for books (save/share/export).
-
 * **User registration** by Fayda ID (16-digit ID, name, phone, optional photo).
-
 * **Borrow flow**: Scan Fayda barcode → scan book QR → save record.
-
 * **Return flow**: Scan book QR → mark as returned.
-
 * **Local storage**: SQLite database with robust backups.
-
 * **Sync system**: Semi-automatic (every X hours) \+ manual sync option.
-
 * **Reports**: Overdue books, top borrowed, counts by category.
-
 * **Search**: Local book search by title, author, category.
 
 ---
@@ -79,17 +67,11 @@ The project will be considered complete when:
 ### 4\) Phase 2 (Nice-to-Have Features)
 
 * Advanced search \+ filters.
-
 * User management (blocking, fines, borrowing limits).
-
 * Notifications (SMS) for overdue books.
-
 * Multi-device conflict resolution with logs.
-
 * Role-based accounts for librarians.
-
 * Cloud-hosted dashboard (web) for church admin.
-
 * Report export to CSV/PDF.
 
 ---
@@ -97,13 +79,9 @@ The project will be considered complete when:
 ### 5\) Tech Stack (Practical, Low-Cost)
 
 * **Mobile framework**: React Native (Expo).
-
 * **Local database**: SQLite (via react-native-sqlite-storage).
-
 * **QR handling**: Expo barcode scanner \+ QR generation library.
-
 * **Backend/Sync**: Supabase (Postgres \+ Auth \+ Storage).
-
 * **Hosting**: Supabase free tier or cheap VPS when needed.
 
 ---
@@ -123,13 +101,9 @@ The project will be considered complete when:
 ### 7\) Workflow Overview
 
 * **Book QR**: Contains book\_code, scanned for transactions.
-
 * **User Fayda ID**: Scanned to identify users.
-
 * **Borrow Flow**: Scan Fayda → scan Book → record saved.
-
 * **Return Flow**: Scan Book → mark as returned.
-
 * **Reports**: Generate overdue, top books, top readers.
 
 ---
@@ -137,11 +111,8 @@ The project will be considered complete when:
 ### 8\) Offline-First Sync Strategy
 
 * Every action writes immediately to local SQLite.
-
 * Sync triggers: automatic (on Wi-Fi every X hours) \+ manual “Sync Now” button.
-
 * Data uploaded in **batch bundles** to Supabase.
-
 * Conflict resolution: duplicate filtering & admin conflict list.
 
 ---
@@ -149,23 +120,14 @@ The project will be considered complete when:
 ### 9\) Core App Screens
 
 1. Login / Shift start.
-
 2. Dashboard with key counts.
-
 3. Scan (borrow/return mode).
-
 4. Register User.
-
 5. Register Book \+ Generate QR.
-
 6. Books List & Search.
-
 7. Transactions History.
-
 8. Reports.
-
 9. Sync page.
-
 10. Settings.
 
 ---
@@ -173,13 +135,9 @@ The project will be considered complete when:
 ### 10\) Privacy & Security
 
 * Store minimal user data.
-
 * Encrypt sensitive Fayda ID if possible.
-
 * HTTPS-only sync.
-
 * Role-based access control.
-
 * Limit photo retention.
 
 ---
@@ -187,9 +145,7 @@ The project will be considered complete when:
 ### 11\) Equipment & Costs
 
 * Basic Android phones: Avalable by the librarian
-
 * QR label printing at local print shops: 20 Birr per sticker.
-
 * Hosting: Supabase free tier.
 
 ---
@@ -209,9 +165,7 @@ The project will be considered complete when:
 ### 13\) Risks & Mitigation
 
 * **Risk**: Forgetting to sync → **Mitigation**: auto-sync \+ reminders.
-
 * **Risk**: Poor barcode scanning → **Mitigation**: good QR printing \+ phone flashlight.
-
 * **Risk**: Data corruption during sync → **Mitigation**: batch uploads & validation.
 
 ---
@@ -219,10 +173,3 @@ The project will be considered complete when:
 ### 14\) Conclusion
 
 This **Digital Library System** will modernize the church’s library operations with a **low-cost, offline-first solution**, ensuring smooth daily operations, reliable data storage, and minimal equipment costs.
-
-# 
-
-# 
-
-# 
-

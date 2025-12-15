@@ -1,31 +1,49 @@
 // church-library-app/utils/shift.ts
+
 import { getShiftsForLibrarian } from "../db/queries/shifts";
+import type { Shift } from "../db/queries/shifts";
 
-export async function isInsideShift(username: string): Promise<boolean> {
-  const shifts = await getShiftsForLibrarian(username);
-  if (!shifts || shifts.length === 0) return false;
+/**
+ * Returns the active shift for a librarian at the current time.
+ * If no active shift exists, returns null.
+ */
+export async function getActiveShift(username: string) {
+  const shifts: Shift[] = await getShiftsForLibrarian(username);
+  if (!shifts.length) return null;
 
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10); // YYYY-MM-DD
-  const currentTime = now.toTimeString().slice(0, 5); // HH:mm
+  const now = Date.now();
 
-  for (const s of shifts) {
-    // Type guard to ensure s has the expected properties
-    if (
-      typeof s === "object" &&
-      s !== null &&
-      "date" in s &&
-      "start_time" in s &&
-      "end_time" in s
-    ) {
-      const shift = s as { date: string; start_time: string; end_time: string };
-      if (shift.date !== today) continue;
+  for (const shift of shifts) {
+    // start_time & end_time are stored as ISO strings
+    const startTs = new Date(shift.start_time).getTime();
+    const endTs = new Date(shift.end_time).getTime();
 
-      if (currentTime >= shift.start_time && currentTime <= shift.end_time) {
-        return true;
-      }
+    if (now >= startTs && now <= endTs) {
+      return {
+        ...shift,
+        startTs,
+        endTs,
+      };
     }
   }
 
-  return false;
+  return null;
+}
+
+/**
+ * Returns true if the librarian is currently inside an active shift.
+ */
+export async function isInsideShift(username: string): Promise<boolean> {
+  return Boolean(await getActiveShift(username));
+}
+
+/**
+ * Returns the end timestamp (ms) of the current active shift.
+ * Used for auto-logout scheduling.
+ */
+export async function getShiftEndTime(
+  username: string
+): Promise<number | null> {
+  const active = await getActiveShift(username);
+  return active ? active.endTs : null;
 }

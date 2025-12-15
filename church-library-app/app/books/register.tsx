@@ -9,8 +9,10 @@ import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { addBook } from "../../db/books";
-
 import { events } from "../../utils/events";
+
+import { getSession } from "../../lib/session";
+import { isInsideShift } from "../../utils/shift";
 
 export default function RegisterBook() {
   const router = useRouter();
@@ -28,6 +30,34 @@ export default function RegisterBook() {
   // QR code ref
   const qrRef = useRef<any>(null);
 
+  /**
+   * 🔐 ACTION GUARD
+   * Must be called before ANY write
+   */
+  const assertCanWrite = async (): Promise<boolean> => {
+    const session = await getSession();
+
+    if (!session) {
+      Alert.alert("Session Expired", "Please log in again.");
+      router.replace("/auth/login");
+      return false;
+    }
+
+    // Admin bypass
+    if (session.role === "admin") return true;
+
+    const allowed = await isInsideShift(session.username);
+    if (!allowed) {
+      Alert.alert(
+        "Action Blocked",
+        "❌ Your shift has ended. You cannot perform this action."
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   // Save QR as image
   const saveQrToGallery = async () => {
     try {
@@ -36,21 +66,12 @@ export default function RegisterBook() {
         return;
       }
 
-      // First, check and request permissions
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      
-      if (status !== 'granted') {
+      if (status !== "granted") {
         Alert.alert(
-          "Permission Required", 
+          "Permission Required",
           "Please allow gallery access to save QR codes."
         );
-        return;
-      }
-
-      // Check if we can save to library
-      const canSave = await MediaLibrary.isAvailableAsync();
-      if (!canSave) {
-        Alert.alert("Error", "Cannot save to gallery on this device.");
         return;
       }
 
@@ -58,7 +79,8 @@ export default function RegisterBook() {
         qrRef.current.toDataURL((data: string) => resolve(data));
       });
 
-      const fileUri = FileSystem.cacheDirectory + `book-${createdBookCode}.png`;
+      const fileUri =
+        FileSystem.cacheDirectory + `book-${createdBookCode}.png`;
 
       await FileSystem.writeAsStringAsync(fileUri, base64, {
         encoding: FileSystem.EncodingType.Base64,
@@ -68,8 +90,6 @@ export default function RegisterBook() {
       await MediaLibrary.createAlbumAsync("Church Library", asset, false);
 
       Alert.alert("Success", "QR code saved to gallery!");
-      
-      // Clean up the temporary file
       await FileSystem.deleteAsync(fileUri).catch(() => {});
     } catch (error) {
       console.log("QR Save Error:", error);
@@ -79,6 +99,10 @@ export default function RegisterBook() {
 
   // Submit handler
   const handleRegister = async () => {
+    // 🔐 Guard FIRST
+    const allowed = await assertCanWrite();
+    if (!allowed) return;
+
     if (!title.trim()) return Alert.alert("Error", "Title is required.");
     if (!author.trim()) return Alert.alert("Error", "Author is required.");
 
@@ -96,29 +120,42 @@ export default function RegisterBook() {
 
       events.emit("refresh-books");
       events.emit("refresh-dashboard");
-
     } catch (err) {
-      Alert.alert("Error", "Failed to add book.");
       console.log("Book add error:", err);
+      Alert.alert("Error", "Failed to add book.");
     }
   };
 
   // If saved → show QR screen
   if (createdBookCode) {
     return (
-      <View style={{ flex: 1, padding: 20, justifyContent: "center", alignItems: "center" }}>
+      <View
+        style={{
+          flex: 1,
+          padding: 20,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 20 }}>
           Book Registered!
         </Text>
 
-        <QRCode value={createdBookCode} size={180} getRef={(c) => (qrRef.current = c)} />
+        <QRCode
+          value={createdBookCode}
+          size={180}
+          getRef={(c) => (qrRef.current = c)}
+        />
 
         <View style={{ marginTop: 30 }}>
           <Button title="Save QR to Gallery" onPress={saveQrToGallery} />
         </View>
 
         <View style={{ marginTop: 20 }}>
-          <Button title="Register Another Book" onPress={() => setCreatedBookCode(null)} />
+          <Button
+            title="Register Another Book"
+            onPress={() => setCreatedBookCode(null)}
+          />
         </View>
 
         <View style={{ marginTop: 20 }}>
@@ -139,48 +176,28 @@ export default function RegisterBook() {
         placeholder="Title"
         value={title}
         onChangeText={setTitle}
-        style={{
-          borderWidth: 1,
-          padding: 10,
-          marginBottom: 10,
-          borderRadius: 6,
-        }}
+        style={{ borderWidth: 1, padding: 10, marginBottom: 10 }}
       />
 
       <TextInput
         placeholder="Author"
         value={author}
         onChangeText={setAuthor}
-        style={{
-          borderWidth: 1,
-          padding: 10,
-          marginBottom: 10,
-          borderRadius: 6,
-        }}
+        style={{ borderWidth: 1, padding: 10, marginBottom: 10 }}
       />
 
       <TextInput
         placeholder="Category"
         value={category}
         onChangeText={setCategory}
-        style={{
-          borderWidth: 1,
-          padding: 10,
-          marginBottom: 10,
-          borderRadius: 6,
-        }}
+        style={{ borderWidth: 1, padding: 10, marginBottom: 10 }}
       />
 
       <TextInput
         placeholder="Notes (optional)"
         value={notes}
         onChangeText={setNotes}
-        style={{
-          borderWidth: 1,
-          padding: 10,
-          marginBottom: 10,
-          borderRadius: 6,
-        }}
+        style={{ borderWidth: 1, padding: 10, marginBottom: 10 }}
       />
 
       <TextInput
@@ -188,12 +205,7 @@ export default function RegisterBook() {
         value={copies}
         onChangeText={setCopies}
         keyboardType="numeric"
-        style={{
-          borderWidth: 1,
-          padding: 10,
-          marginBottom: 20,
-          borderRadius: 6,
-        }}
+        style={{ borderWidth: 1, padding: 10, marginBottom: 20 }}
       />
 
       <Button title="Register Book" onPress={handleRegister} />
