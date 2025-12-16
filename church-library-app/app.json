@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "church-library-app",
+    "name": "Otona St.Mary Library Management App",
+    "displayName": "Otona St.Mary LibMgt",
     "slug": "church-library-app",
     "version": "1.0.0",
     "jsEngine": "hermes",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icons/android/mipmap-mdpi/church_library_app.png",
     "scheme": "churchlibraryapp",
     "router": {
       "origin": false
@@ -13,13 +14,17 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.churchlibraryapp",
+      "icon": "./assets/icons/ios/AppIcon.appiconset/Icon-App-60x60@2x.png"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icons/android/mipmap-mdpi/church_library_app_foreground.png",
+        "backgroundImage": "./assets/icons/android/values/ic_launcher_background.xml",
         "backgroundColor": "#ffffff"
       },
+      "icon": "./assets/icons/android/mipmap-mdpi/church_library_app.png",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -42,7 +47,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -60,7 +65,7 @@
           "audioPermission": "Allow this app to access your audio files"
         }
       ],
-      "expo-sqlite" 
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
