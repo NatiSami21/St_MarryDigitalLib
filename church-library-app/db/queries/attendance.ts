@@ -9,7 +9,9 @@ export interface ShiftAttendance {
   librarian_username: string;
   clock_in: number | null;
   clock_out: number | null;
-  status: string | null; // on_time | late | completed
+  status: string | null;  
+  created_at: number;      
+  updated_at: number;  
   synced: number; // 0 | 1
 }
 

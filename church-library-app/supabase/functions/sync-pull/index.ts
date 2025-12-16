@@ -39,12 +39,13 @@ serve(async (req) => {
     // FIRST PULL = SEND FULL SNAPSHOT
     // -----------------------------------------------------
     if (!last_pulled_commit) {
-      const [books, users, librarians, transactions, shifts] = await Promise.all([
+      const [books, users, librarians, transactions, shifts, attendance] = await Promise.all([
         supabase.from("books").select("*"),
         supabase.from("users").select("*"),
         supabase.from("librarians").select("*"),
         supabase.from("transactions").select("*"),
         supabase.from("shifts").select("*"),
+        supabase.from("shift_attendance").select("*"),
       ]);
 
       return Response.json({
@@ -55,6 +56,7 @@ serve(async (req) => {
           librarians: librarians.data ?? [],
           transactions: transactions.data ?? [],
           shifts: shifts.data ?? [],
+          shift_attendance: attendance.data ?? [],
           pending_commits: [],
           last_pulled_commit: now,
         },
@@ -67,12 +69,13 @@ serve(async (req) => {
     // -----------------------------------------------------
     const since = last_pulled_commit;
 
-    const [books, users, librarians, transactions, shifts] = await Promise.all([
+    const [books, users, librarians, transactions, shifts, attendance] = await Promise.all([
       supabase.from("books").select("*").gte("updated_at", since),
       supabase.from("users").select("*").gte("updated_at", since),
       supabase.from("librarians").select("*").gte("updated_at", since),
       supabase.from("transactions").select("*").gte("updated_at", since),
       supabase.from("shifts").select("*").gte("updated_at", since),
+      supabase.from("shift_attendance").select("*").gte("updated_at", since),
     ]);
 
     // cloud pending commits (usually none after fix)
@@ -89,6 +92,7 @@ serve(async (req) => {
         librarians: librarians.data ?? [],
         transactions: transactions.data ?? [],
         shifts: shifts.data ?? [],
+        shift_attendance: attendance.data ?? [],
         pending_commits: cloudCommits ?? [],
         last_pulled_commit: now,
       },

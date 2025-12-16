@@ -130,6 +130,8 @@ export const createShiftAttendanceTable = `
     clock_out INTEGER,
     late_minutes INTEGER DEFAULT 0,
     status TEXT,                     -- on_time / late / absent / incomplete
+    created_at INTEGER,              -- ← ADD THIS
+    updated_at INTEGER,              -- ← ADD THIS
     synced INTEGER DEFAULT 0,
 
     FOREIGN KEY(librarian_username) REFERENCES librarians(username),

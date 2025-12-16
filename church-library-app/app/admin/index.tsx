@@ -130,7 +130,7 @@ export default function AdminDashboard() {
       <MenuButton
         title="Attendance"
         subtitle="Daily staff attendance, lateness, login & logout times"
-        onPress={() => router.push("./admin/attendance")}
+        onPress={() => router.push("/admin/attendance")}
       />
 
       <MenuButton

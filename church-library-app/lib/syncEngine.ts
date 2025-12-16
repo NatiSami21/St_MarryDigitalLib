@@ -417,6 +417,12 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
     // SHIFT ATTENDANCE
     if (Array.isArray(snapshot.shift_attendance)) {
       for (const a of snapshot.shift_attendance) {
+        // Convert timestamp string to Unix timestamp (ms)
+        const clockInTs = a.clock_in ? new Date(a.clock_in).getTime() : null;
+        const clockOutTs = a.clock_out ? new Date(a.clock_out).getTime() : null;
+        const createdAtTs = a.created_at ? new Date(a.created_at).getTime() : Date.now();
+        const updatedAtTs = a.updated_at ? new Date(a.updated_at).getTime() : Date.now();
+
         await runAsync(
           `INSERT INTO shift_attendance (
             id,
@@ -440,11 +446,11 @@ export async function applySnapshotLocally(snapshot: any): Promise<boolean> {
             a.id,
             a.shift_id,
             a.librarian_username,
-            a.clock_in ?? null,
-            a.clock_out ?? null,
+            clockInTs,
+            clockOutTs,
             a.status ?? "not_started",
-            a.created_at ?? Date.now(),
-            a.updated_at ?? Date.now(),
+            createdAtTs,
+            updatedAtTs,
           ]
         );
       }

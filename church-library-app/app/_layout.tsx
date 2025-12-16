@@ -19,7 +19,7 @@ export default function Layout() {
   useEffect(() => {
     const initialize = async () => {
       await initDb();
-      // runMigrations(); // enable only when needed
+      //runMigrations(); // enable only when needed
       setReady(true);
     };
 

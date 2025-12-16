@@ -65,7 +65,6 @@ export async function runMigrations() {
     // -----------------------------
     // 4. TRANSACTIONS MIGRATIONS
     // -----------------------------
-    // 4. TRANSACTIONS MIGRATIONS (final)
     try {
       db.execSync(`ALTER TABLE transactions ADD COLUMN borrowed_at TEXT;`);
     } catch {}
@@ -82,7 +81,135 @@ export async function runMigrations() {
     try { db.execSync(`ALTER TABLE users ADD COLUMN gender TEXT;`); } catch {}
     try { db.execSync(`ALTER TABLE users ADD COLUMN address TEXT;`); } catch {}
 
-    console.log("✅ Database migrations finished.");
+    // -----------------------------
+    // 6. SHIFT ATTENDANCE MIGRATIONS
+    // -----------------------------
+    console.log("🔄 Checking shift_attendance table migrations...");
+    
+    // Create the table if it doesn't exist (with old schema first)
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS shift_attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        librarian_username TEXT NOT NULL,
+        shift_id INTEGER NOT NULL,
+        clock_in INTEGER,
+        clock_out INTEGER,
+        late_minutes INTEGER DEFAULT 0,
+        status TEXT,
+        synced INTEGER DEFAULT 0
+      );
+    `);
+
+    // Add missing columns that exist in Supabase
+    try { 
+      db.execSync(`ALTER TABLE shift_attendance ADD COLUMN created_at INTEGER;`); 
+      console.log("  ✅ Added created_at column");
+    } catch (e: any) {
+      if (!e.message?.includes('duplicate column name')) {
+        console.log("  ℹ️ created_at column already exists or error:", e.message);
+      }
+    }
+
+    try { 
+      db.execSync(`ALTER TABLE shift_attendance ADD COLUMN updated_at INTEGER;`); 
+      console.log("  ✅ Added updated_at column");
+    } catch (e: any) {
+      if (!e.message?.includes('duplicate column name')) {
+        console.log("  ℹ️ updated_at column already exists or error:", e.message);
+      }
+    }
+
+    // Backfill existing records with current timestamp if they're null
+    const now = Date.now();
+    try {
+      db.execSync(`
+        UPDATE shift_attendance 
+        SET created_at = ${now}, updated_at = ${now}
+        WHERE created_at IS NULL OR updated_at IS NULL
+      `);
+      console.log("  ✅ Backfilled timestamps for existing records");
+    } catch (e: any) {
+      console.log("  ℹ️ No records to backfill or error:", e.message);
+    }
+
+    // Also ensure the table has proper constraints
+    try {
+      // Add foreign key constraint if not already there
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_shift_attendance_shift_id 
+        ON shift_attendance(shift_id);
+      `);
+      
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_shift_attendance_username 
+        ON shift_attendance(librarian_username);
+      `);
+      
+      console.log("  ✅ Ensured indexes on shift_attendance table");
+    } catch (e: any) {
+      console.log("  ℹ️ Error creating indexes:", e.message);
+    }
+
+    // -----------------------------
+    // 7. SHIFTS TABLE MIGRATIONS
+    // -----------------------------
+    console.log("🔄 Checking shifts table migrations...");
+    
+    // Create shifts table if it doesn't exist
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS shifts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        librarian_username TEXT NOT NULL,
+        date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted INTEGER DEFAULT 0
+      );
+    `);
+
+    // Add missing columns for shifts
+    try { 
+      db.execSync(`ALTER TABLE shifts ADD COLUMN created_at INTEGER;`); 
+      console.log("  ✅ Added created_at column to shifts");
+    } catch (e: any) {
+      if (!e.message?.includes('duplicate column name')) {
+        console.log("  ℹ️ created_at column already exists in shifts or error:", e.message);
+      }
+    }
+
+    try { 
+      db.execSync(`ALTER TABLE shifts ADD COLUMN updated_at INTEGER;`); 
+      console.log("  ✅ Added updated_at column to shifts");
+    } catch (e: any) {
+      if (!e.message?.includes('duplicate column name')) {
+        console.log("  ℹ️ updated_at column already exists in shifts or error:", e.message);
+      }
+    }
+
+    try { 
+      db.execSync(`ALTER TABLE shifts ADD COLUMN deleted INTEGER DEFAULT 0;`); 
+      console.log("  ✅ Added deleted column to shifts");
+    } catch (e: any) {
+      if (!e.message?.includes('duplicate column name')) {
+        console.log("  ℹ️ deleted column already exists in shifts or error:", e.message);
+      }
+    }
+
+    // Backfill shifts table timestamps
+    try {
+      db.execSync(`
+        UPDATE shifts 
+        SET created_at = ${now}, updated_at = ${now}, deleted = 0
+        WHERE created_at IS NULL OR updated_at IS NULL
+      `);
+      console.log("  ✅ Backfilled timestamps for shifts records");
+    } catch (e: any) {
+      console.log("  ℹ️ No shifts records to backfill or error:", e.message);
+    }
+
+    console.log("✅ All database migrations finished successfully.");
   } catch (err) {
     console.log("❌ Migration Error:", err);
   }
