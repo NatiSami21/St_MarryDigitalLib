@@ -189,7 +189,7 @@ async function applyCommit(commit: PushCommit) {
         result = await supabase
           .from("shift_attendance")
           .update({
-            clock_in: payload.clock_in,
+            clock_in: new Date(payload.clock_in).toISOString(),
             status: "in_progress",
             updated_at: new Date().toISOString(),
           })
