@@ -99,7 +99,14 @@ export default function RegisterUser() {
       />
 
       <TouchableOpacity
-        onPress={() => router.push("/users/scan")}
+        onPress={() =>
+          router.push({
+            pathname: "/users/scan",
+            params: {
+              returnTo: "/users/register", // ✅ IMPORTANT
+            },
+          })
+        }
         style={{
           backgroundColor: "#1e3a8a",
           padding: 12,
@@ -111,6 +118,7 @@ export default function RegisterUser() {
           Scan Fayda ID
         </Text>
       </TouchableOpacity>
+
 
       {/* Name */}
       <Text style={{ marginBottom: 6 }}>Full Name</Text>

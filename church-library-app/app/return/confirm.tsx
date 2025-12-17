@@ -81,33 +81,38 @@ export default function ConfirmReturn() {
 
 
   const handleConfirm = async () => {
-
     const allowed = await assertCanWrite();
     if (!allowed) return;
 
-    if (!user || !book) return;
-
-    if (!activeBorrow) {
-      Alert.alert("Not Borrowed", "This user did NOT borrow this book.");
-      return;
-    }
+    if (!user || !book || !activeBorrow) return;
 
     setProcessing(true);
 
-    await completeReturn(activeBorrow.tx_id);
+    const session = await getSession();
+
+    const ok = await completeReturn({
+      tx_id: activeBorrow.tx_id,
+      book_code,
+      librarian_username: session?.username ?? "unknown",
+      device_id: activeBorrow.device_id ?? "unknown-device"
+    });
+
+    if (!ok) {
+      Alert.alert("Error", "Borrow record not found or already returned.");
+      setProcessing(false);
+      return;
+    }
 
     Alert.alert("Success", "Book Returned Successfully!", [
-      {
-        text: "OK",
-        onPress: () => router.replace("/transactions"),
-      },
+      { text: "OK", onPress: () => router.replace("/transactions") }
     ]);
-    
+
     events.emit("refresh-dashboard");
     events.emit("refresh-transactions");
 
     setProcessing(false);
   };
+
 
   if (loading)
     return <ActivityIndicator size="large" style={{ marginTop: 50 }} />;

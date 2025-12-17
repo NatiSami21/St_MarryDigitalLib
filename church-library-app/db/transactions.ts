@@ -90,12 +90,16 @@ export async function borrowBook(fayda_id: string, book_code: string) {
   
 
   // 8. Append readable commit (for admin UI)
-  await appendCommit({
-    librarian_username,
-    device_id,
-    type: "borrow_book",
-    payload: { fayda_id, book_code, tx_id }
-  });
+  try {
+    await appendCommit({
+      librarian_username,
+      device_id,
+      type: "borrow_book",
+      payload: { fayda_id, book_code, tx_id }
+    });
+  } catch (e) {
+    console.warn("⚠️ Commit failed, continuing locally", e);
+  }
 
   // 9. Add pending commit (for sync engine)
   await addCommit("insert", "transactions", {
@@ -133,64 +137,94 @@ export async function getUserBorrows(fayda_id: string) {
     [fayda_id]
   );
 }
-
 // ---------------------------------------------
-// 4. Complete Return
+// 4. Complete Return (PATCHED)
 // ---------------------------------------------
 export interface ReturnArgs {
-  fayda_id: string;
+  tx_id: string;
   book_code: string;
   librarian_username: string;
   device_id: string;
 }
 
 export async function completeReturn({
-  fayda_id,
+  tx_id,
   book_code,
   librarian_username,
   device_id
 }: ReturnArgs): Promise<boolean> {
+
+  console.log("RETURN PARAMS", {
+    tx_id,
+    book_code,
+    librarian_username,
+    device_id
+  });
+
+
   const now = new Date().toISOString();
 
-  // Find active borrow
-  const record = await getActiveBorrow(fayda_id, book_code);
-  if (!record) throw new Error("Active borrow record not found.");
+  // 🔍 Verify transaction exists and is not returned
+  const tx = await db.getFirstAsync(
+    `
+    SELECT tx_id FROM transactions
+    WHERE tx_id = ? AND returned_at IS NULL
+    `,
+    [tx_id]
+  );
 
-  // Get the book first
+  if (!tx) {
+    console.warn("⚠️ completeReturn: tx already returned or not found", tx_id);
+    return false;
+  }
+
+  // ✅ Mark transaction as returned
+  await runAsync(
+    `
+    UPDATE transactions
+    SET returned_at = ?, sync_status = 'pending'
+    WHERE tx_id = ?
+    `,
+    [now, tx_id]
+  );
+
+  // 📚 Restore book stock
   const book = await db.getFirstAsync<Book>(
     `SELECT * FROM books WHERE book_code = ?`,
     [book_code]
   );
 
-  // Mark transaction as returned
   await runAsync(
-    `UPDATE transactions SET returned_at = ?, sync_status = 'pending'
-     WHERE tx_id = ?`,
-    [now, record.tx_id]
-  );
-
-  // Restore book stock
-  await runAsync(
-    `UPDATE books SET copies = copies + 1, updated_at = ? WHERE book_code = ?`,
+    `
+    UPDATE books
+    SET copies = copies + 1, updated_at = ?
+    WHERE book_code = ?
+    `,
     [now, book_code]
   );
 
-  // 🔥 Fix #3 — Add commit for book update
+  // 🔥 Commit book update
   await addCommit("update", "books", {
     book_code,
     copies: (book?.copies ?? 0) + 1,
     updated_at: now
   });
 
-  await appendCommit({
-    librarian_username,
-    device_id,
-    type: "return_book",
-    payload: { book_code, fayda_id }
-  });
+  // 📦 Append transaction commit
+  try {
+    await appendCommit({
+      librarian_username,
+      device_id,
+      type: "return_book",
+      payload: { tx_id, book_code }
+    });
+  } catch (e) {
+    console.warn("⚠️ Commit failed, continuing locally", e);
+  }
 
   return true;
 }
+
 
 // ---------------------------------------------
 // 5. List ALL transactions

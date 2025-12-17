@@ -2,12 +2,18 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 export default function ScanFayda() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+
   const router = useRouter();
+  const params = useLocalSearchParams();
+
+  // 🔑 Default fallback keeps borrow flow intact
+  const returnTo =
+    typeof params.returnTo === "string" ? params.returnTo : "/borrow";
 
   if (!permission?.granted) {
     return (
@@ -41,11 +47,12 @@ export default function ScanFayda() {
           setScanned(true);
           const id = result.data;
 
+          // ✅ Return scanned Fayda ID to caller
           router.replace({
-            pathname: "/borrow",
+            pathname: returnTo as any,
             params: {
-              fayda_id: id,
-              scan_id: Date.now(), // 🔥 Unique scan event
+              fayda: id,
+              scan_id: Date.now(), // ensures rerender
             },
           });
         }}
@@ -61,7 +68,9 @@ export default function ScanFayda() {
           borderRadius: 10,
         }}
       >
-        <Text style={{ color: "white", fontSize: 16 }}>Scan Fayda / ID</Text>
+        <Text style={{ color: "white", fontSize: 16 }}>
+          Scan Fayda / ID
+        </Text>
       </View>
     </View>
   );

@@ -1,5 +1,6 @@
 // db/commits.ts
 import { runAsync, getAllAsync } from "./sqlite";
+import "react-native-get-random-values";
 import { v4 as uuid } from "uuid";
 import { db } from "./sqlite";
 
