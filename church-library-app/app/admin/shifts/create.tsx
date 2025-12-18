@@ -105,7 +105,7 @@ export default function CreateShiftScreen() {
           <Ionicons name="arrow-back" size={24} color="#0f172a" />
         </TouchableOpacity>
         <Text style={styles.title}>Create Shift</Text>
-        <View style={{ width: 40 }} /> {/* Spacer for alignment */}
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -120,13 +120,14 @@ export default function CreateShiftScreen() {
             Tap to select a librarian for this shift
           </Text>
           <View style={styles.librariansGrid}>
-            {librarians.map((lib) => (
+            {librarians.map((lib, index) => (
               <TouchableOpacity
                 key={lib.id}
                 onPress={() => setSelectedUsername(lib.username)}
                 style={[
                   styles.librarianCard,
                   selectedUsername === lib.username && styles.selectedCard,
+                  index < librarians.length - 1 && styles.librarianCardMargin
                 ]}
               >
                 <View style={styles.librarianInfo}>
@@ -256,7 +257,7 @@ export default function CreateShiftScreen() {
           ]}
           disabled={!selectedUsername}
         >
-          <Ionicons name="save-outline" size={22} color="white" />
+          <Ionicons name="save-outline" size={22} color="white" style={styles.saveIcon} />
           <Text style={styles.saveButtonText}>Save Shift</Text>
         </TouchableOpacity>
       </View>
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 100, // Extra padding for save button
+    paddingBottom: 100,
   },
   section: {
     marginBottom: 24,
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   librariansGrid: {
-    gap: 12,
+    // gap property removed
   },
   librarianCard: {
     flexDirection: "row",
@@ -356,6 +357,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+  },
+  librarianCardMargin: {
+    marginBottom: 12, // Added to replace gap
   },
   selectedCard: {
     backgroundColor: "#1e3a8a",
@@ -473,7 +477,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#1e3a8a",
     padding: 18,
     borderRadius: 12,
-    gap: 10,
+    // gap property removed
+  },
+  saveIcon: {
+    marginRight: 10, // Added to replace gap
   },
   saveButtonDisabled: {
     backgroundColor: "#94a3b8",

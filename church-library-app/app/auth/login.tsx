@@ -76,7 +76,7 @@ export default function LoginScreen() {
        * 4. Force PIN change if required
        * --------------------------------------------------*/
       if (user.require_pin_change) {
-        router.replace({
+        router.push({
           pathname: "/auth/change-pin",
           params: { username: user.username },
         });
@@ -111,20 +111,34 @@ export default function LoginScreen() {
       });
 
       /* --------------------------------------------------
-       * 7. Implicit Attendance (LIBRARIAN ONLY)
+       * 7. Attendance handling (LIBRARIAN ONLY)
        * --------------------------------------------------*/
+      const HIGH_ATTENDANCE_VERIFICATION = 
+        (process.env.EXPO_PUBLIC_HIGH_ATTENDANCE_VERIFICATION === "true") || false;
+
       if (user.role === "librarian" && activeShift) {
-        await implicitClockIn(
-          activeShift.id,
-          user.username,
-          activeShift.startTs
-        );
+        if (HIGH_ATTENDANCE_VERIFICATION) {
+          // Use push instead of replace to maintain navigation stack
+          router.push("/attendance/verify");
+          return;
+        } else {
+          // Legacy behavior
+          await implicitClockIn(
+            activeShift.id,
+            user.username,
+            activeShift.startTs
+          );
+
+          scheduleShiftLogout(activeShift.endTs, () => {
+            router.replace("/auth/login");
+          });
+        }
       }
 
       /* --------------------------------------------------
-       * 8. Schedule auto logout at shift end
+       * 8. Schedule auto logout at shift end (for non-high verification)
        * --------------------------------------------------*/
-      if (user.role === "librarian" && activeShift) {
+      if (user.role === "librarian" && activeShift && !HIGH_ATTENDANCE_VERIFICATION) {
         scheduleShiftLogout(activeShift.endTs, () => {
           router.replace("/auth/login");
         });
@@ -134,7 +148,14 @@ export default function LoginScreen() {
        * 9. Navigate
        * --------------------------------------------------*/
       console.log("✅ Login successful:", user.username);
-      router.replace(user.role === "admin" ? "/admin" : "/");
+      
+      // For admin or after successful attendance verification
+      if (user.role === "admin") {
+        router.replace("/admin");
+      } else if (!HIGH_ATTENDANCE_VERIFICATION) {
+        router.replace("/");
+      }
+      // If HIGH_ATTENDANCE_VERIFICATION, we already pushed to /attendance/verify
 
     } catch (err) {
       console.error("❌ Login error:", err);

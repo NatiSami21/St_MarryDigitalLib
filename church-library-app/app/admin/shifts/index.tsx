@@ -9,7 +9,7 @@ import {
   Alert,
   StyleSheet,
   StatusBar,
-  Platform // Add Platform import
+  Platform
 } from "react-native";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -129,7 +129,7 @@ export default function AdminShiftsScreen() {
             style={styles.editButton}
           >
             <Ionicons name="create-outline" size={18} color="#1e40af" />
-            <Text style={styles.buttonText}>Edit</Text>
+            <Text style={[styles.buttonText, styles.editButtonText]}>Edit</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -137,7 +137,7 @@ export default function AdminShiftsScreen() {
             style={styles.deleteButton}
           >
             <Ionicons name="trash-outline" size={18} color="#dc2626" />
-            <Text style={styles.buttonText}>Delete</Text>
+            <Text style={[styles.buttonText, styles.deleteButtonText]}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -547,7 +547,12 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  editButtonText: {
     color: "#1e40af",
+  },
+  deleteButtonText: {
+    color: "#dc2626",
   },
   emptyState: {
     alignItems: "center",
