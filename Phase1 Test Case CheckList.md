@@ -85,26 +85,26 @@
 
 - [X] **Preconditions:** Librarian logged in during shift, books/users exist.
 - [X] Login as `lib1` during shift → success.
-- [ ] Borrow book: scan user `user-1`, book `book-1`.
-- [ ] Local `transactions` row created, sync pending.
-- [ ] Sync push → server updated, log success.
-- [ ] Return book → `transactions` updated, commit queued.
-- [ ] Offline borrow → commit created, later sync succeeds.
+- [X] Borrow book: scan user `user-1`, book `book-1`.
+- [X] Local `transactions` row created, sync pending.
+- [X] Sync push → server updated, log success.
+- [X] Return book → `transactions` updated, commit queued.
+- [X] Offline borrow → commit created, later sync succeeds.
 
 **Edge Cases:**
 
-- [ ] Borrow with 0 copies → UI blocks.
-- [ ] Login outside shift → prevented.
+- [X] Borrow with 0 copies → UI blocks.
+- [X] Login outside shift → prevented.
 
 ---
 
 ## Cross-cutting Tests
 
-- [ ] **Device Binding:** `meta.device_id` matches `librarians.device_id`.
-- [ ] **Sync Recovery:** Push failure → log entry; retry after server back → success.
-- [ ] **Security:** PIN hashed & salted, raw PIN never stored.
-- [ ] **Race Conditions:** Concurrent pushes → no duplicate commits.
-- [ ] **Timezone Handling:** Shift times use local device time.
+- [X] **Device Binding:** `meta.device_id` matches `librarians.device_id`.
+- [X] **Sync Recovery:** Push failure → log entry; retry after server back → success.
+- [X] **Security:** PIN hashed & salted, raw PIN never stored.
+- [X] **Race Conditions:** Concurrent pushes → no duplicate commits.
+- [X] **Timezone Handling:** Shift times use local device time.
 
 ---
 
@@ -120,8 +120,8 @@
 
 ## Sign-off
 
-- [ ] All steps passed, logs and screenshots attached.
-- [ ] Failures documented with reproduction steps and DB/log snapshots.
+- [X] All steps passed, logs and screenshots attached.
+- [X] Failures documented with reproduction steps and DB/log snapshots.
 
 ---
 
