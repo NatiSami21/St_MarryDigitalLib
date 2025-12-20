@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "church-library-app",
+    "name": "FAYDA Smart Library Management",
     "slug": "church-library-app",
     "version": "1.0.0",
     "jsEngine": "hermes",
@@ -12,9 +12,11 @@
     },
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -33,18 +35,19 @@
       "package": "com.anonymous.churchlibraryapp",
       "jsEngine": "hermes"
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
+          "resizeMode": "cover",
           "backgroundColor": "#ffffff",
           "dark": {
             "backgroundColor": "#000000"
@@ -64,10 +67,12 @@
       "expo-secure-store",
       "expo-web-browser"
     ],
+
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
+
     "extra": {
       "router": {},
       "eas": {
