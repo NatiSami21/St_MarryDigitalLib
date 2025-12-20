@@ -424,8 +424,8 @@ function HomeContent() {
           </TouchableOpacity>
           
           <View style={styles.topNavCenter}>
-            <Text style={styles.topNavTitle}>FAYDA LIBRARY</Text>
-            <Text style={styles.topNavSubtitle}>Smart Management System</Text>
+            <Text style={styles.topNavTitle}>FAYDA </Text>
+            <Text style={styles.topNavSubtitle}>Smart Library Management</Text>
           </View>
           
           <TouchableOpacity
@@ -520,7 +520,7 @@ function HomeContent() {
             <QuickActionButton
               label="Borrow Book"
               path="/borrow"
-              color="#003153"
+              color="#005B82"
               icon="book"
             />
             <QuickActionButton
@@ -532,26 +532,26 @@ function HomeContent() {
             <QuickActionButton
               label="Add Book"
               path="/books/register"
-              color="#D4AF37"
+              color="#005B82"
               icon="add"
             />
             <QuickActionButton
               label="Register User"
               path="/users/register"
-              color="#27AE60"
+              color="#005B82"
               icon="person-add"
             />
             <QuickActionButton
-              label="Scan Book"
-              path="/books/scan"
-              color="#7F8C8D"
-              icon="qr-code-scanner"
+              label="Inventory"
+              path="/books/inventory"
+              color="#005B82"
+              icon="import-contacts"
             />
             <QuickActionButton
               label="Generate Report"
               path="/reports"
-              color="#E74C3C"
-              icon="insert-chart"
+              color="#005B82"
+              icon="print"
             />
           </View>
 

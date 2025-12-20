@@ -187,8 +187,8 @@ export default function LoginScreen() {
         {/* App Header Section */}
         <View style={styles.header}>
           <Icon name="book-open" size={48} color="#D4AF37" style={styles.headerIcon} />
-          <Text style={styles.appTitle}>FAYDA LIBRARY</Text>
-          <Text style={styles.appSubtitle}>Smart Management System</Text>
+          <Text style={styles.appTitle}>FAYDA </Text>
+          <Text style={styles.appSubtitle}>Smart Library Management</Text>
         </View>
 
         {/* Login Card */}
