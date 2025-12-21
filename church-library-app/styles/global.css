@@ -1,0 +1,33 @@
+:root {
+    /* Core Color Palette - As Defined */
+    --color-cream: #FDFBF7;
+    --color-navy: #003153;
+    --color-gold: #D4AF37;
+    --color-teal: #005B82;
+    --color-border: #E5E0D5;
+    --color-text-dark: #2C3E50;
+    --color-text-light: #7F8C8D;
+    --color-success: #27AE60;
+    --color-warning: #F39C12;
+    --color-error: #E74C3C;
+
+    /* Spacing & Sizing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+
+    /* Shadows */
+    --shadow-subtle: 0 2px 8px rgba(0, 49, 83, 0.08);
+    --shadow-card: 0 4px 12px rgba(0, 49, 83, 0.1);
+    --shadow-button: 0 2px 4px rgba(0, 49, 83, 0.2);
+
+    /* Typography */
+    --font-family: 'System'; /* Use React Native's default system font */
+}

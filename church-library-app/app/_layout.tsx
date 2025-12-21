@@ -1,8 +1,8 @@
-// church-library-app/app/_layout.tsx
-
+// app/_layout.tsx
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState, useRef } from "react";
-import { AppState, AppStateStatus, Alert } from "react-native";
+import { AppState, AppStateStatus, Alert, Platform } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { initDb } from "../db/sqlite";
 import { runMigrations } from "../db/migrations";
@@ -10,6 +10,16 @@ import { runMigrations } from "../db/migrations";
 import { getSession, clearSession } from "../lib/session";
 import { getShiftEndTime, isInsideShift } from "../utils/shift";
 import { scheduleShiftLogout, clearShiftLogout } from "../lib/shiftSession";
+
+// Optional: For Android immersive mode
+import * as NavigationBar from 'expo-navigation-bar';
+
+if (Platform.OS === 'android') {
+  NavigationBar.setVisibilityAsync("hidden");
+  NavigationBar.setBehaviorAsync("overlay-swipe");
+  NavigationBar.setPositionAsync("absolute");
+  NavigationBar.setBackgroundColorAsync("#00000000");
+}
 
 export default function Layout() {
   const [ready, setReady] = useState(false);
@@ -87,5 +97,9 @@ export default function Layout() {
 
   if (!ready) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </SafeAreaProvider>
+  );
 }

@@ -1,5 +1,5 @@
 // app/home/index.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,33 +9,47 @@ import {
   StyleSheet,
   Alert,
   Dimensions,
+  Animated,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
-
+import { Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { getDashboardStats, DashboardStats } from "../../db/dashboard";
 import { getSession, clearSession } from "../../lib/session";
 import { getLibrarianByUsername } from "../../db/queries/librarians";
 import { events } from "../../utils/events";
 import { syncAll, getSyncStatus } from "../../lib/syncEngine";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
-// Define the Librarian type based on your database schema
+// Navigation drawer width
+const DRAWER_WIDTH = width * 0.75;
+
 interface Librarian {
   id: number;
   username: string;
   role: string;
-  // Add other properties as per your schema
+  name?: string;
+  full_name?: string;
 }
 
-export default function HomeDashboard() {
+// Main Home Component
+function HomeContent() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState("");
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  // Animation values
+  const drawerAnimation = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   // SYNC STATUS
   const [syncStatus, setSyncStatus] = useState({
@@ -61,15 +75,12 @@ export default function HomeDashboard() {
         const user = await getLibrarianByUsername(session.username);
         
         if (user) {
-          // Check if user has a name property, otherwise use username
-          // Adjust this based on your actual Librarian type
-          const displayName = (user as any).name || 
-                             (user as any).full_name || 
+          const displayName = (user as Librarian).name || 
+                             (user as Librarian).full_name || 
                              user.username;
           setUserDisplayName(displayName);
           setIsAdmin(user.role === "admin");
         } else {
-          // Fallback to session username if user not found
           setUserDisplayName(session.username);
         }
       }
@@ -93,24 +104,61 @@ export default function HomeDashboard() {
     return () => sub.remove();
   }, []);
 
+  // Toggle drawer animation
+  useEffect(() => {
+    if (drawerVisible) {
+      Animated.parallel([
+        Animated.timing(drawerAnimation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 0.5,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(drawerAnimation, {
+          toValue: -DRAWER_WIDTH,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [drawerVisible]);
+
   const handleSync = async () => {
     setSyncLoading(true);
     try {
       const result = await syncAll();
 
       if (result.success) {
-        Alert.alert("Synced", "Cloud sync completed successfully.", [
-          { text: "OK", style: "default" }
-        ]);
+        Alert.alert(
+          "Sync Complete",
+          "All data has been synchronized with the cloud.",
+          [{ text: "OK", style: "default" }]
+        );
       } else {
-        Alert.alert("Sync Failed", "Check internet and try again.", [
-          { text: "OK", style: "cancel" }
-        ]);
+        Alert.alert(
+          "Sync Failed",
+          "Please check your internet connection and try again.",
+          [{ text: "OK", style: "cancel" }]
+        );
       }
     } catch (err) {
-      Alert.alert("Error", "Sync error occurred.", [
-        { text: "OK", style: "destructive" }
-      ]);
+      Alert.alert(
+        "Sync Error",
+        "An unexpected error occurred during synchronization.",
+        [{ text: "OK", style: "destructive" }]
+      );
     } finally {
       setSyncLoading(false);
       loadSyncStatus();
@@ -118,9 +166,15 @@ export default function HomeDashboard() {
   };
 
   const getStatusColor = () => {
-    if (syncLoading) return "#f59e0b"; // amber while syncing
-    if (syncStatus.pending > 0) return "#ef4444"; // red
-    return "#10b981"; // emerald
+    if (syncLoading) return "#F39C12"; // amber while syncing
+    if (syncStatus.pending > 0) return "#E74C3C"; // red
+    return "#27AE60"; // green
+  };
+
+  const getStatusIcon = () => {
+    if (syncLoading) return "sync";
+    if (syncStatus.pending > 0) return "cloud-upload";
+    return "cloud-done";
   };
 
   const getLastSyncTime = () => {
@@ -137,14 +191,32 @@ export default function HomeDashboard() {
     return date.toLocaleDateString();
   };
 
-  if (loading || !stats) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f46e5" />
-        <Text style={styles.loadingText}>Loading Dashboard...</Text>
-      </View>
+  const handleTabPress = (tab: string, path: string) => {
+    setActiveTab(tab);
+    router.push(path as any);
+    setDrawerVisible(false);
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      "Logout Confirmation",
+      "Are you sure you want to logout from the library system?",
+      [
+        { 
+          text: "Cancel", 
+          style: "cancel",
+        },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            await clearSession();
+            router.replace("/auth/login");
+          },
+        },
+      ]
     );
-  }
+  };
 
   const StatCard = ({ 
     title, 
@@ -160,7 +232,7 @@ export default function HomeDashboard() {
     icon: React.ReactNode;
   }) => (
     <View style={styles.statCard}>
-      <View style={[styles.statIconContainer, { backgroundColor: color + '15' }]}>
+      <View style={styles.statIconContainer}>
         {icon}
       </View>
       <View style={styles.statContent}>
@@ -185,468 +257,814 @@ export default function HomeDashboard() {
     icon: string;
   }) => (
     <TouchableOpacity
-      style={[styles.quickAction, { backgroundColor: color }]}
-      onPress={() => router.push(path as any)}
+      style={styles.quickAction}
+      onPress={() => {
+        router.push(path as any);
+        setDrawerVisible(false);
+      }}
       activeOpacity={0.7}
     >
-      <MaterialIcons name={icon as any} size={24} color="white" />
+      <View style={[styles.quickActionIcon, { backgroundColor: color }]}>
+        <MaterialIcons name={icon as any} size={24} color="#FFFFFF" />
+      </View>
       <Text style={styles.quickActionText} numberOfLines={2}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 
-  return (
-    <>
-      <ScrollView 
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
+  const NavItem = ({ 
+    icon, 
+    label, 
+    path, 
+    tab, 
+    isAdminOnly = false 
+  }: {
+    icon: string;
+    label: string;
+    path: string;
+    tab: string;
+    isAdminOnly?: boolean;
+  }) => {
+    if (isAdminOnly && !isAdmin) return null;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.navItem,
+          activeTab === tab && styles.navItemActive
+        ]}
+        onPress={() => handleTabPress(tab, path)}
       >
-        {/* HEADER WITH USER INFO */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.userName}>{userDisplayName}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.syncStatus}
-            onPress={handleSync}
-            disabled={syncLoading}
-          >
-            <View style={[styles.syncDot, { backgroundColor: getStatusColor() }]} />
-            <Text style={styles.syncText}>
-              {syncLoading ? "Syncing..." : 
-               syncStatus.pending > 0 ? `${syncStatus.pending} pending` : "Synced"}
-            </Text>
-            {syncStatus.pending > 0 && (
-              <View style={styles.pendingBadge}>
-                <Text style={styles.pendingText}>{syncStatus.pending}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        <Ionicons 
+          name={icon as any} 
+          size={24} 
+          color={activeTab === tab ? "#D4AF37" : "#003153"} 
+        />
+        <Text style={[
+          styles.navItemText,
+          activeTab === tab && styles.navItemTextActive
+        ]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
-        {/* Admin Panel Button */}
-        {isAdmin && (
-          <TouchableOpacity
-            onPress={() => router.push("/admin")}
-            style={styles.adminButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="shield-checkmark" size={20} color="white" />
-            <Text style={styles.adminButtonText}>Administration Panel</Text>
-            <Ionicons name="chevron-forward" size={20} color="white" />
-          </TouchableOpacity>
-        )}
+  if (loading || !stats) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#003153" />
+        <Text style={styles.loadingText}>Loading Library Dashboard...</Text>
+      </View>
+    );
+  }
 
-        {/* STATS GRID */}
-        <View style={styles.statsGrid}>
-          <StatCard
-            title="Total Books"
-            value={stats.totalBooks}
-            color="#4f46e5"
-            icon={<Ionicons name="library" size={24} color="#4f46e5" />}
-          />
-          <StatCard
-            title="Total Users"
-            value={stats.totalUsers}
-            color="#0ea5a4"
-            icon={<FontAwesome5 name="users" size={20} color="#0ea5a4" />}
-          />
-          <StatCard
-            title="Active Borrows"
-            value={stats.activeBorrows}
-            color="#ef4444"
-            subtitle={`${stats.availableCopies} available`}
-            icon={<MaterialIcons name="bookmark" size={24} color="#ef4444" />}
-          />
-          <StatCard
-            title="Overdue"
-            value={stats.overdueCount}
-            color="#dc2626"
-            subtitle="14+ days"
-            icon={<MaterialIcons name="warning" size={24} color="#dc2626" />}
-          />
-        </View>
-
-        {/* BORROWING OVERVIEW */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Borrowing Overview</Text>
-          <View style={styles.overviewCard}>
-            <View style={styles.overviewRow}>
-              <View style={styles.overviewItem}>
-                <Text style={styles.overviewValue}>{stats.returnedToday}</Text>
-                <Text style={styles.overviewLabel}>Returned Today</Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.overviewItem}>
-                <Text style={styles.overviewValue}>{stats.returnedThisMonth}</Text>
-                <Text style={styles.overviewLabel}>This Month</Text>
-              </View>
+  return (
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#003153" barStyle="light-content" />
+      
+      {/* Navigation Drawer */}
+      <Animated.View style={[
+        styles.drawer,
+        { transform: [{ translateX: drawerAnimation }] }
+      ]}>
+        <View style={styles.drawerHeader}>
+          <View style={styles.drawerUserInfo}>
+            <View style={styles.userAvatar}>
+              <Ionicons name="person" size={32} color="#003153" />
             </View>
-            <View style={styles.lastSync}>
-              <Ionicons name="time-outline" size={14} color="#6b7280" />
-              <Text style={styles.lastSyncText}>
-                Last sync: {getLastSyncTime()}
+            <View style={styles.userDetails}>
+              <Text style={styles.drawerUserName}>{userDisplayName}</Text>
+              <Text style={styles.drawerUserRole}>
+                {isAdmin ? "Administrator" : "Librarian"}
               </Text>
             </View>
           </View>
+          <TouchableOpacity
+            onPress={() => setDrawerVisible(false)}
+            style={styles.drawerCloseButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={24} color="#003153" />
+          </TouchableOpacity>
         </View>
 
-        {/* QUICK ACTIONS */}
-        <View style={styles.section}>
+        <ScrollView style={styles.drawerContent}>
+          {/* Main Navigation */}
+          <Text style={styles.drawerSectionTitle}>MAIN NAVIGATION</Text>
+          <NavItem icon="home" label="Dashboard" path="/home" tab="dashboard" />
+          <NavItem icon="book" label="Books" path="/books/list" tab="books" />
+          <NavItem icon="people" label="Users" path="/users/list" tab="users" />
+          <NavItem icon="swap-horizontal" label="Transactions" path="/transactions" tab="transactions" />
+          <NavItem icon="stats-chart" label="Reports" path="/reports" tab="reports" />
+          <NavItem icon="calendar" label="Shifts" path="/librarian/shifts" tab="myshifts" />
+
+          {/* Administration Section */}
+          {isAdmin && (
+            <>
+              <Text style={styles.drawerSectionTitle}>ADMINISTRATION</Text>
+              <NavItem icon="shield-checkmark" label="Admin Panel" path="/admin" tab="admin" />
+              <NavItem icon="person-add" label="Manage Librarians" path="/admin/librarians" tab="librarians" />
+              <NavItem icon="time" label="Shift Management" path="/admin/shifts" tab="shifts" />
+              <NavItem icon="sync" label="Sync Control" path="/admin/sync" tab="sync" />
+            </>
+          )}
+          
+          {/* Support Section */}
+          <Text style={styles.drawerSectionTitle}>SUPPORT</Text>
+          <TouchableOpacity style={styles.navItem}>
+            <Ionicons name="help-circle" size={24} color="#003153" />
+            <Text style={styles.navItemText}>Help & Guides</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem}>
+            <Ionicons name="information-circle" size={24} color="#003153" />
+            <Text style={styles.navItemText}>About FAYDA</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem}>
+            <Ionicons name="settings" size={24} color="#003153" />
+            <Text style={styles.navItemText}>Settings</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <View style={styles.drawerFooter}>
+          <TouchableOpacity 
+            style={styles.logoutButton}
+            onPress={handleLogout}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+          <Text style={styles.drawerVersion}>FAYDA v1.0 • DiguwaSoft</Text>
+        </View>
+      </Animated.View>
+
+      {/* Overlay */}
+      <Animated.View 
+        style={[styles.overlay, { opacity: overlayOpacity }]}
+        pointerEvents={drawerVisible ? 'auto' : 'none'}
+      >
+        <TouchableOpacity 
+          style={StyleSheet.absoluteFill}
+          onPress={() => setDrawerVisible(false)}
+          activeOpacity={1}
+        />
+      </Animated.View>
+
+      {/* Main Content */}
+      <SafeAreaView style={styles.mainContent} edges={['top', 'left', 'right']}>
+        {/* Top Navigation Bar */}
+        <View style={[styles.topNav, { paddingTop: insets.top }]}>
+          <TouchableOpacity
+            onPress={() => setDrawerVisible(true)}
+            style={styles.menuButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="menu" size={28} color="#003153" />
+          </TouchableOpacity>
+          
+          <View style={styles.topNavCenter}>
+            <Text style={styles.topNavTitle}>FAYDA </Text>
+            <Text style={styles.topNavSubtitle}>Smart Library Management</Text>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.userBadge}
+            onPress={() => setDrawerVisible(true)}
+          >
+            <Ionicons name="person-circle" size={32} color="#003153" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Dashboard Content */}
+        <ScrollView 
+          style={styles.dashboardContent}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.contentContainer}
+        >
+          {/* Welcome Card */}
+          <View style={styles.welcomeCard}>
+            <View>
+              <Text style={styles.welcomeGreeting}>Welcome back,</Text>
+              <Text style={styles.userName}>{userDisplayName}</Text>
+              <Text style={styles.welcomeSubtitle}>
+                {isAdmin ? "Administrator Access" : "Librarian Access"}
+              </Text>
+            </View>
+            <View style={styles.welcomeBadge}>
+              <Ionicons name="library" size={24} color="#D4AF37" />
+            </View>
+          </View>
+
+          {/* Sync Status Card */}
+          <TouchableOpacity
+            style={styles.syncCard}
+            onPress={handleSync}
+            disabled={syncLoading}
+          >
+            <View style={styles.syncHeader}>
+              <Ionicons 
+                name={getStatusIcon() as any} 
+                size={24} 
+                color={getStatusColor()} 
+              />
+              <View style={styles.syncTextContainer}>
+                <Text style={styles.syncTitle}>
+                  {syncLoading ? "Syncing in progress..." : 
+                   syncStatus.pending > 0 ? "Sync Required" : "All Systems Synced"}
+                </Text>
+                <Text style={styles.syncSubtitle}>
+                  {syncStatus.pending > 0 
+                    ? `${syncStatus.pending} pending changes` 
+                    : `Last sync: ${getLastSyncTime()}`}
+                </Text>
+              </View>
+            </View>
+            {syncStatus.pending > 0 && (
+              <View style={styles.syncBadge}>
+                <Text style={styles.syncBadgeText}>{syncStatus.pending}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Stats Grid */}
+          <Text style={styles.sectionTitle}>Library Overview</Text>
+          <View style={styles.statsGrid}>
+            <StatCard
+              title="Total Books"
+              value={stats.totalBooks}
+              icon={<Ionicons name="library" size={28} color="#003153" />}
+            />
+            <StatCard
+              title="Total Users"
+              value={stats.totalUsers}
+              icon={<FontAwesome5 name="users" size={24} color="#005B82" />}
+            />
+            <StatCard
+              title="Active Borrows"
+              value={stats.activeBorrows}
+              subtitle={`${stats.availableCopies} available`}
+              icon={<MaterialIcons name="bookmark" size={28} color="#D4AF37" />}
+            />
+            <StatCard
+              title="Overdue"
+              value={stats.overdueCount}
+              subtitle="14+ days"
+              icon={<MaterialIcons name="warning" size={28} color="#E74C3C" />}
+            />
+          </View>
+
+          {/* Quick Actions */}
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
             <QuickActionButton
               label="Borrow Book"
               path="/borrow"
-              color="#4f46e5"
+              color="#005B82"
               icon="book"
             />
             <QuickActionButton
               label="Return Book"
               path="/return"
-              color="#059669"
+              color="#005B82"
               icon="assignment-return"
             />
             <QuickActionButton
-              label="Books"
-              path="/books/list"
-              color="#0ea5a4"
-              icon="menu-book"
+              label="Add Book"
+              path="/books/register"
+              color="#005B82"
+              icon="add"
             />
             <QuickActionButton
-              label="Users"
-              path="/users/list"
-              color="#2563eb"
-              icon="people"
-            />
-            <QuickActionButton
-              label="Transactions"
-              path="/transactions"
-              color="#374151"
-              icon="receipt"
-            />
-            <QuickActionButton
-              label="Print Report"
-              path="/reports"
-              color="#d97706"
-              icon="print"
+              label="Register User"
+              path="/users/register"
+              color="#005B82"
+              icon="person-add"
             />
             <QuickActionButton
               label="Inventory"
               path="/books/inventory"
-              color="#7c3aed"
-              icon="inventory"
+              color="#005B82"
+              icon="import-contacts"
             />
             <QuickActionButton
-              label="Shifts"
-              path="/librarian/shifts"
-              color="#db2777"
-              icon="schedule"
-            />
-            <QuickActionButton
-              label="Attendance"
-              path="/librarian/shifts/history"
-              color="#dc2626"
-              icon="history"
+              label="Generate Report"
+              path="/reports"
+              color="#005B82"
+              icon="print"
             />
           </View>
-        </View>
 
-        {/* LOGOUT SECTION */}
-        <View style={styles.logoutSection}>
-          <View style={styles.logoutCard}>
-            <View style={styles.logoutHeader}>
-              <Ionicons name="log-out-outline" size={24} color="#dc2626" />
-              <View style={styles.logoutTexts}>
-                <Text style={styles.logoutTitle}>Session Control</Text>
-                <Text style={styles.logoutSubtitle}>
-                  {userDisplayName} • {isAdmin ? "Administrator" : "Librarian"}
-                </Text>
+          {/* Activity Overview */}
+          <View style={styles.activityCard}>
+            <Text style={styles.activityTitle}>Today's Activity</Text>
+            <View style={styles.activityStats}>
+              <View style={styles.activityStat}>
+                <Text style={styles.activityValue}>{stats.returnedToday}</Text>
+                <Text style={styles.activityLabel}>Books Returned</Text>
+              </View>
+              <View style={styles.activityDivider} />
+              <View style={styles.activityStat}>
+                <Text style={styles.activityValue}>{stats.activeBorrows}</Text>
+                <Text style={styles.activityLabel}>Active Loans</Text>
+              </View>
+              <View style={styles.activityDivider} />
+              <View style={styles.activityStat}>
+                <Text style={styles.activityValue}>{stats.overdueCount}</Text>
+                <Text style={styles.activityLabel}>Overdue Items</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={async () => {
-                Alert.alert(
-                  "Logout Confirmation",
-                  "Are you sure you want to logout?",
-                  [
-                    { 
-                      text: "Cancel", 
-                      style: "cancel",
-                      onPress: () => console.log("Cancel Pressed")
-                    },
-                    {
-                      text: "Logout",
-                      style: "destructive",
-                      onPress: async () => {
-                        await clearSession();
-                        router.replace("/auth/login");
-                      },
-                    },
-                  ],
-                  { cancelable: true }
-                );
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.logoutButtonText}>Logout</Text>
-              <Ionicons name="log-out" size={18} color="white" />
-            </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
-      {/* FLOATING SYNC BUTTON */}
-      <TouchableOpacity
-        style={[
-          styles.fab,
-          syncLoading && styles.fabSyncing,
-          syncStatus.pending > 0 && styles.fabPending
-        ]}
-        onPress={handleSync}
-        disabled={syncLoading}
-        activeOpacity={0.8}
-      >
-        {syncLoading ? (
-          <ActivityIndicator color="white" size="small" />
-        ) : (
-          <>
-            <Ionicons 
-              name={syncStatus.pending > 0 ? "cloud-upload" : "cloud-done"} 
-              size={24} 
-              color="white" 
-            />
-            {syncStatus.pending > 0 && (
-              <View style={styles.fabBadge}>
-                <Text style={styles.fabBadgeText}>{syncStatus.pending}</Text>
-              </View>
+        {/* Bottom Tab Bar - Using SafeAreaView for bottom */}
+        <SafeAreaView style={styles.tabBarContainer} edges={['bottom']}>
+          <View style={styles.tabBar}>
+            <TouchableOpacity 
+              style={styles.tabItem}
+              onPress={() => handleTabPress("dashboard", "/home")}
+            >
+              <Ionicons 
+                name="home" 
+                size={24} 
+                color={activeTab === "dashboard" ? "#D4AF37" : "#7F8C8D"} 
+              />
+              <Text style={[
+                styles.tabLabel,
+                activeTab === "dashboard" && styles.tabLabelActive
+              ]}>Home</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.tabItem}
+              onPress={() => handleTabPress("books", "/books/list")}
+            >
+              <Ionicons 
+                name="book" 
+                size={24} 
+                color={activeTab === "books" ? "#D4AF37" : "#7F8C8D"} 
+              />
+              <Text style={[
+                styles.tabLabel,
+                activeTab === "books" && styles.tabLabelActive
+              ]}>Books</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.tabItem}
+              onPress={() => handleTabPress("users", "/users/list")}
+            >
+              <Ionicons 
+                name="people" 
+                size={24} 
+                color={activeTab === "users" ? "#D4AF37" : "#7F8C8D"} 
+              />
+              <Text style={[
+                styles.tabLabel,
+                activeTab === "users" && styles.tabLabelActive
+              ]}>Users</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.tabItem}
+              onPress={() => handleTabPress("transactions", "/transactions")}
+            >
+              <MaterialCommunityIcons 
+                name="swap-horizontal" 
+                size={24} 
+                color={activeTab === "transactions" ? "#D4AF37" : "#7F8C8D"} 
+              />
+              <Text style={[
+                styles.tabLabel,
+                activeTab === "transactions" && styles.tabLabelActive
+              ]}>Transactions</Text>
+            </TouchableOpacity>
+            
+            {isAdmin && (
+              <TouchableOpacity 
+                style={styles.tabItem}
+                onPress={() => handleTabPress("admin", "/admin")}
+              >
+                <Ionicons 
+                  name="shield-checkmark" 
+                  size={24} 
+                  color={activeTab === "admin" ? "#D4AF37" : "#7F8C8D"} 
+                />
+                <Text style={[
+                  styles.tabLabel,
+                  activeTab === "admin" && styles.tabLabelActive
+                ]}>Admin</Text>
+              </TouchableOpacity>
             )}
-          </>
-        )}
-      </TouchableOpacity>
-    </>
+          </View>
+        </SafeAreaView>
+
+        {/* Floating Action Button (Sync) */}
+        <TouchableOpacity
+          style={[
+            styles.fab,
+            syncLoading && styles.fabSyncing,
+            syncStatus.pending > 0 && styles.fabPending,
+            { bottom: insets.bottom + 80 } // Position above tab bar considering safe area
+          ]}
+          onPress={handleSync}
+          disabled={syncLoading}
+          activeOpacity={0.8}
+        >
+          {syncLoading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <Ionicons 
+                name={syncStatus.pending > 0 ? "cloud-upload" : "cloud-done"} 
+                size={28} 
+                color="white" 
+              />
+              {syncStatus.pending > 0 && (
+                <View style={styles.fabBadge}>
+                  <Text style={styles.fabBadgeText}>{syncStatus.pending}</Text>
+                </View>
+              )}
+            </>
+          )}
+        </TouchableOpacity>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+// Main Export Component
+export default function HomeDashboard() {
+  return (
+    <SafeAreaProvider>
+      <HomeContent />
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#FDFBF7",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#FDFBF7",
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
-    color: "#64748b",
+    color: "#003153",
     fontWeight: "500",
   },
-  header: {
+  
+  // Drawer Styles
+  drawer: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: DRAWER_WIDTH,
+    backgroundColor: "#FFFFFF",
+    zIndex: 1000,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  drawerHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: "white",
+    alignItems: "center",
+    padding: 24,
+    paddingTop: 60,
+    backgroundColor: "#F8FAFC",
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: "#E5E0D5",
   },
-  greeting: {
-    fontSize: 14,
-    color: "#64748b",
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1e293b",
-  },
-  syncStatus: {
+  drawerUserInfo: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    minWidth: 100,
+    flex: 1,
   },
-  syncDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+  userAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#F0F7FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
-  syncText: {
+  userDetails: {
+    flex: 1,
+  },
+  drawerUserName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#003153",
+    marginBottom: 4,
+  },
+  drawerUserRole: {
+    fontSize: 14,
+    color: "#005B82",
+    fontWeight: "500",
+  },
+  drawerCloseButton: {
+    padding: 8,
+  },
+  drawerContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+  },
+  drawerSectionTitle: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#475569",
+    fontWeight: "700",
+    color: "#7F8C8D",
+    marginTop: 20,
+    marginBottom: 12,
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
-  pendingBadge: {
+  navItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 4,
+    borderRadius: 12,
+  },
+  navItemActive: {
+    backgroundColor: "#F0F7FF",
+    borderLeftWidth: 4,
+    borderLeftColor: "#D4AF37",
+  },
+  navItemText: {
+    fontSize: 16,
+    color: "#003153",
+    fontWeight: "500",
+    marginLeft: 16,
+  },
+  navItemTextActive: {
+    color: "#003153",
+    fontWeight: "700",
+  },
+  drawerFooter: {
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E0D5",
+    backgroundColor: "#FFFFFF",
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E74C3C",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  logoutButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  drawerVersion: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  overlay: {
     position: "absolute",
-    top: -6,
-    right: -6,
-    backgroundColor: "#ef4444",
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#000000",
+    zIndex: 999,
+  },
+  
+  // Main Content Styles
+  mainContent: {
+    flex: 1,
+  },
+  topNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E0D5",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  topNavCenter: {
+    alignItems: "center",
+  },
+  topNavTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#003153",
+    letterSpacing: 0.5,
+  },
+  topNavSubtitle: {
+    fontSize: 12,
+    color: "#005B82",
+    marginTop: 2,
+  },
+  userBadge: {
+    padding: 8,
+  },
+  dashboardContent: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  
+  // Welcome Card
+  welcomeCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E5E0D5",
+    shadowColor: "#003153",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 5,
+  },
+  welcomeGreeting: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#003153",
+    marginBottom: 4,
+  },
+  welcomeSubtitle: {
+    fontSize: 14,
+    color: "#005B82",
+    fontWeight: "500",
+  },
+  welcomeBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFF5E1",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "white",
+    borderColor: "#D4AF37",
   },
-  pendingText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  adminButton: {
+  
+  // Sync Card
+  syncCard: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#4f46e5",
-    paddingVertical: 14,
-    marginHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 20,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: "#4f46e5",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "#E5E0D5",
+    shadowColor: "#003153",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
   },
-  adminButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
+  syncHeader: {
+    flexDirection: "row",
+    alignItems: "center",
   },
+  syncTextContainer: {
+    marginLeft: 16,
+  },
+  syncTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#003153",
+    marginBottom: 2,
+  },
+  syncSubtitle: {
+    fontSize: 14,
+    color: "#7F8C8D",
+  },
+  syncBadge: {
+    backgroundColor: "#E74C3C",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  syncBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  
+  // Section Title
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#003153",
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  
+  // Stats Grid
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 16,
     marginBottom: 24,
-    gap: 12,
+    gap: 16,
   },
   statCard: {
-    width: (width - 40) / 2,
-    backgroundColor: "white",
+    width: (width - 56) / 2,
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E5E0D5",
+    shadowColor: "#003153",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "#F0F7FF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginBottom: 16,
   },
   statContent: {
     flex: 1,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#1e293b",
-    marginBottom: 2,
-  },
-  statTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#64748b",
-  },
-  statSubtitle: {
-    fontSize: 12,
-    color: "#94a3b8",
-    marginTop: 2,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1e293b",
-    marginBottom: 12,
-  },
-  overviewCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  overviewRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  overviewItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  overviewValue: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#4f46e5",
+    color: "#003153",
     marginBottom: 4,
   },
-  overviewLabel: {
+  statTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#003153",
+  },
+  statSubtitle: {
     fontSize: 14,
-    color: "#64748b",
-    fontWeight: "500",
+    color: "#7F8C8D",
+    marginTop: 4,
   },
-  divider: {
-    width: 1,
-    backgroundColor: "#e2e8f0",
-  },
-  lastSync: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    gap: 6,
-  },
-  lastSyncText: {
-    fontSize: 12,
-    color: "#6b7280",
-    fontWeight: "500",
-  },
+  
+  // Quick Actions Grid
   actionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 16,
+    marginBottom: 24,
   },
   quickAction: {
-    width: (width - 52) / 3,
-    aspectRatio: 1,
+    width: (width - 56) / 3,
+    alignItems: "center",
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
     borderRadius: 16,
-    padding: 12,
-    justifyContent: "space-between",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -654,100 +1072,131 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   quickActionText: {
-    color: "white",
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 16,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#003153",
+    textAlign: "center",
+    lineHeight: 18,
   },
-  logoutSection: {
-    paddingHorizontal: 20,
+  
+  // Activity Card
+  activityCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 40,
-    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#E5E0D5",
+    shadowColor: "#003153",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 5,
   },
-  logoutCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    borderLeftWidth: 4,
-    borderLeftColor: "#dc2626",
-  },
-  logoutHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-    gap: 12,
-  },
-  logoutTexts: {
-    flex: 1,
-  },
-  logoutTitle: {
+  activityTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1e293b",
-    marginBottom: 2,
+    color: "#003153",
+    marginBottom: 20,
   },
-  logoutSubtitle: {
-    fontSize: 14,
-    color: "#64748b",
-  },
-  logoutButton: {
-    backgroundColor: "#dc2626",
+  activityStats: {
     flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  activityStat: {
+    alignItems: "center",
+    flex: 1,
+  },
+  activityValue: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#D4AF37",
+    marginBottom: 4,
+  },
+  activityLabel: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    textAlign: "center",
+  },
+  activityDivider: {
+    width: 1,
+    backgroundColor: "#E5E0D5",
+  },
+  
+  // Tab Bar Container
+  tabBarContainer: {
+    backgroundColor: "#FFFFFF",
+  },
+  // Bottom Tab Bar
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E0D5",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  tabItem: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
   },
-  logoutButtonText: {
-    color: "white",
-    fontSize: 16,
+  tabLabel: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  tabLabelActive: {
+    color: "#D4AF37",
     fontWeight: "700",
   },
+  
+  // Floating Action Button
   fab: {
     position: "absolute",
-    bottom: 24,
     right: 20,
-    backgroundColor: "#4f46e5",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    backgroundColor: "#003153",
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#4f46e5",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowColor: "#003153",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+    zIndex: 100,
   },
   fabSyncing: {
-    backgroundColor: "#f59e0b",
+    backgroundColor: "#F39C12",
   },
   fabPending: {
-    backgroundColor: "#ef4444",
+    backgroundColor: "#E74C3C",
   },
   fabBadge: {
     position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: "#dc2626",
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    top: -8,
+    right: -8,
+    backgroundColor: "#E74C3C",
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "white",
-    paddingHorizontal: 4,
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    paddingHorizontal: 6,
   },
   fabBadgeText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "700",
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
   },
 });
