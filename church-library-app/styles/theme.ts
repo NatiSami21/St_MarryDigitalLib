@@ -10,6 +10,7 @@ export const theme = {
     success: '#27AE60',
     warning: '#F39C12',
     error: '#E74C3C',
+    white: '#FFFFFF',
   },
   spacing: {
     xs: 4,
@@ -22,6 +23,13 @@ export const theme = {
     sm: 6,
     md: 12,
     lg: 20,
+  },
+  typography: {
+    h1: { fontSize: 28, fontWeight: '800' },
+    h2: { fontSize: 24, fontWeight: '700' },
+    h3: { fontSize: 20, fontWeight: '600' },
+    body: { fontSize: 16, fontWeight: '400' },
+    caption: { fontSize: 14, fontWeight: '400' },
   },
   shadows: {
     subtle: {
@@ -47,3 +55,7 @@ export const theme = {
     },
   },
 } as const;
+
+
+// Export as Theme for PascalCase usage
+export const Theme = theme;

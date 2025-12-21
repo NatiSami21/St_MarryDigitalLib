@@ -257,6 +257,8 @@ export default function BookDetails() {
         {/* Book Info Card */}
         <View style={styles.bookInfoCard}>
           <View style={styles.bookHeader}>
+            {/* 
+
             <View style={styles.statusBadge}>
               <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
               <Text style={[styles.statusText, { color: statusInfo.color }]}>
@@ -264,10 +266,12 @@ export default function BookDetails() {
               </Text>
             </View>
             
+             */}
+            
             <View style={styles.availabilityChip}>
               <Feather name="book-open" size={14} color="#D4AF37" />
               <Text style={styles.availabilityText}>
-                {book.available_copies}/{book.copies} copies available
+                {book.copies} copies available
               </Text>
             </View>
           </View>
