@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FAYDA Smart Library Management",
-    "slug": "fayda-smart-library",
+    "slug": "church-library-app",
     "version": "1.0.0",
     "jsEngine": "hermes",
     "orientation": "portrait",
