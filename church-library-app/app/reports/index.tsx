@@ -1,4 +1,6 @@
+// church-library-app/app/reports/index.tsx
 import React, { useState } from "react";
+import { router } from "expo-router";
 import { 
   View, 
   Text, 
@@ -154,6 +156,29 @@ export default function ReportsScreen() {
           />
         </View>
 
+        
+        {/* Administrative Exports */}
+        <View style={styles.section}> 
+          <TouchableOpacity
+            style={styles.reportCard}
+            onPress={() => router.push("/reports/export_qrImg")}
+          >
+            <View style={styles.reportIconContainer}>
+              <Icon name="image" size={32} color={Theme.colors.teal} />
+            </View>
+
+            <View style={styles.reportContent}>
+              <Text style={styles.reportTitle}>Export Book QR Images</Text>
+              <Text style={styles.reportDescription}>
+                Export QR codes for all saved books as images
+              </Text>
+            </View>
+
+            <Icon name="chevron-right" size={24} color={Theme.colors.textLight} />
+          </TouchableOpacity>
+        </View>
+
+        
         {/* Report Information */}
         <View style={styles.infoCard}>
           <Icon name="info" size={24} color={Theme.colors.gold} />
@@ -168,27 +193,9 @@ export default function ReportsScreen() {
           </View>
         </View>
 
-        {/* Quick Stats (Placeholder - you can add real stats here) */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Quick Statistics</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Icon name="book-open" size={24} color={Theme.colors.teal} />
-              <Text style={styles.statNumber}>1,234</Text>
-              <Text style={styles.statLabel}>Books</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Icon name="users" size={24} color={Theme.colors.success} />
-              <Text style={styles.statNumber}>567</Text>
-              <Text style={styles.statLabel}>Users</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Icon name="activity" size={24} color={Theme.colors.warning} />
-              <Text style={styles.statNumber}>89</Text>
-              <Text style={styles.statLabel}>Today</Text>
-            </View>
-          </View>
-        </View>
+
+
+
       </ScrollView>
     </View>
   );
