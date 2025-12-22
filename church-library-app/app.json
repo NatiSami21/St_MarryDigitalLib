@@ -6,7 +6,7 @@
     "jsEngine": "hermes",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "faydasmartlibrary",
+    "scheme": "churchlibraryapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
 
