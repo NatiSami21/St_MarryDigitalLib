@@ -29,8 +29,8 @@ export default function BootstrapScreen() {
       <View style={styles.heroSection}>
         <View style={styles.logoContainer}>
           <Icon name="book-open" size={64} color="#D4AF37" />
-          <Text style={styles.appName}>FAYDA</Text>
-          <Text style={styles.appTagline}>Smart Library Management</Text>
+          <Text style={styles.appName}>Otona St.Mary</Text>
+          <Text style={styles.appTagline}>Library Management App</Text>
         </View>
       </View>
 

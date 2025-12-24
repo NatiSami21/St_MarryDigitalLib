@@ -424,8 +424,8 @@ function HomeContent() {
           </TouchableOpacity>
           
           <View style={styles.topNavCenter}>
-            <Text style={styles.topNavTitle}>FAYDA </Text>
-            <Text style={styles.topNavSubtitle}>Smart Library Management</Text>
+            <Text style={styles.topNavTitle}>Otona St.Mary </Text>
+            <Text style={styles.topNavSubtitle}>Library Management App</Text>
           </View>
           
           <TouchableOpacity

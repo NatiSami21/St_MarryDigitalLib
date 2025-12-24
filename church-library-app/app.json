@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "FAYDA Smart Library Management",
+    "name": "Otona Mary Library Management App",
     "slug": "church-library-app",
     "version": "1.0.0",
     "jsEngine": "hermes",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon-otona.png",
     "scheme": "churchlibraryapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -21,7 +21,7 @@
       "predictiveBackGestureEnabled": false,
 
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/icon-otona.png",
         "backgroundColor": "#ffffff"
       },
 
@@ -45,7 +45,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/splash.png",
+          "image": "./assets/splash-otona.png",
           "resizeMode": "cover",
           "ios": {
             "image": "./assets/splash.png",
@@ -53,7 +53,7 @@
             "enableFullScreenImage_legacy": true
           },
           "android": {
-            "image": "./assets/icon.png",
+            "image": "./assets/icon-otona.png",
             "imageWidth": 200,
             "backgroundColor": "#ffffff"
           }
