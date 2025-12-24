@@ -11,25 +11,32 @@ import { getSession, clearSession } from "../lib/session";
 import { getShiftEndTime, isInsideShift } from "../utils/shift";
 import { scheduleShiftLogout, clearShiftLogout } from "../lib/shiftSession";
 
-// Optional: For Android immersive mode
-import * as NavigationBar from 'expo-navigation-bar';
-
-if (Platform.OS === 'android') {
-  NavigationBar.setVisibilityAsync("hidden");
-  NavigationBar.setBehaviorAsync("overlay-swipe");
-  NavigationBar.setPositionAsync("absolute");
-  NavigationBar.setBackgroundColorAsync("#00000000");
-}
+import * as NavigationBar from "expo-navigation-bar";
 
 export default function Layout() {
   const [ready, setReady] = useState(false);
   const router = useRouter();
   const appState = useRef<AppStateStatus>(AppState.currentState);
 
+  /**
+   * Android immersive mode (safe lifecycle)
+   */
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      NavigationBar.setVisibilityAsync("hidden");
+      NavigationBar.setBehaviorAsync("overlay-swipe");
+      NavigationBar.setPositionAsync("absolute");
+      NavigationBar.setBackgroundColorAsync("#00000000");
+    }
+  }, []);
+
+  /**
+   * Initialize database
+   */
   useEffect(() => {
     const initialize = async () => {
       await initDb();
-      //runMigrations(); // enable only when needed
+      // runMigrations(); // enable only when schema changes
       setReady(true);
     };
 
@@ -99,7 +106,11 @@ export default function Layout() {
 
   return (
     <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* Explicit startup order */}
+        <Stack.Screen name="intro" />
+        <Stack.Screen name="index" />
+      </Stack>
     </SafeAreaProvider>
   );
 }
