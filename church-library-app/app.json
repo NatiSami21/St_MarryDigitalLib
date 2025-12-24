@@ -10,13 +10,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
 
-
     "ios": {
       "supportsTablet": true
     },
 
     "android": {
-      "package": "com.diguwasoft.faydasmartlibrary",
+      "package": "com.anonymous.churchlibraryapp",
       "jsEngine": "hermes",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -27,11 +26,12 @@
       },
 
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO",
-        "READ_MEDIA_AUDIO",
-        "ACCESS_MEDIA_LOCATION"
+        "ACCESS_MEDIA_LOCATION",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.CAMERA"
       ]
     },
 
