@@ -18,7 +18,7 @@ export default function IntroScreen() {
   return (
     <View style={styles.container}>
       <Video
-        source={require("../assets/intro.mp4")}
+        source={require("../assets/intro-otona.mp4")}
         style={styles.video}
         shouldPlay
         isLooping={false}
