@@ -1,6 +1,7 @@
 // church-library-app/app/users/register.tsx
 
 import React, { useEffect, useState } from "react";
+import {db} from "../../db/sqlite";
 import {
   ScrollView,
   Text,
@@ -163,10 +164,11 @@ export default function RegisterUser() {
     }
   };
 
-  const handlePhotoChange = (uri: string) => {
-    console.log("Photo selected, URI:", uri);
-    setPhotoUri(uri);
+  const handlePhotoChange = (cloudinaryUrl: string | null) => {
+    console.log("Photo Cloudinary URL:", cloudinaryUrl);
+    setPhotoUri(cloudinaryUrl);
   };
+
 
   const handleSave = async () => {
     const canWrite = await assertCanWrite();
@@ -180,13 +182,16 @@ export default function RegisterUser() {
     setProcessing(true);
 
     try {
+      // Ensure we have a valid photo URI (Cloudinary URL or null)
+      const finalPhotoUri = photoUri || ""; // Empty string for no photo
+
       await upsertUser({
         fayda_id: faydaId,
         name: name.trim(),
         phone: phone.trim(),
         gender: gender.trim(),
         address: address.trim(),
-        photo_uri: photoUri ?? "",
+        photo_uri: finalPhotoUri,
       });
 
       Alert.alert("Success", "User saved successfully!", [
@@ -199,7 +204,7 @@ export default function RegisterUser() {
         },
       ]);
     } catch (err) {
-      console.log(err);
+      console.log("Save error:", err);
       Alert.alert("Error", "Failed to save user. Please try again.");
     } finally {
       setProcessing(false);
@@ -372,7 +377,16 @@ export default function RegisterUser() {
           <Text style={styles.sectionTitle}>Profile Photo</Text>
           <Text style={styles.sectionSubtitle}>Optional - Capture or upload a photo</Text>
           <View style={styles.photoContainer}>
-            <PhotoPicker imageUri={photoUri} onChange={handlePhotoChange} />
+           <PhotoPicker 
+              imageUri={photoUri} 
+              onChange={handlePhotoChange}
+              onUploadStatus={(isUploading) => {
+                // Optionally disable save button while uploading
+                if (isUploading) {
+                  // You might want to show a loading state
+                }
+              }}
+            />
           </View>
         </View>
 

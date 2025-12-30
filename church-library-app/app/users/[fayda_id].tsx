@@ -155,6 +155,8 @@ export default function UserDetailsScreen() {
         </View>
 
         {/* Quick Stats */}
+        {/*
+        
         <View style={styles.statsCard}>
           <Text style={styles.cardTitle}>
             <Icon name="activity" size={20} color={Theme.colors.navy} />
@@ -179,6 +181,8 @@ export default function UserDetailsScreen() {
             </View>
           </View>
         </View>
+         
+         */}
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>

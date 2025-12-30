@@ -42,6 +42,10 @@ export type UserUpdate = {
 export async function upsertUser(user: UserUpsert): Promise<void> {
   const now = new Date().toISOString();
 
+  // First, check if user exists to determine if it's an insert or update
+  const existingUser = await getUser(user.fayda_id);
+  const isUpdate = !!existingUser;
+
   await db.runAsync(
     `
     INSERT INTO users (fayda_id, name, phone, gender, address, photo_uri, created_at, updated_at, sync_status)
@@ -66,6 +70,19 @@ export async function upsertUser(user: UserUpsert): Promise<void> {
       now,
     ]
   );
+
+  // Create a commit for the upsert operation
+  await addCommit(isUpdate ? "update" : "insert", "users", {
+    fayda_id: user.fayda_id,
+    name: user.name,
+    phone: user.phone ?? "",
+    gender: user.gender ?? "",
+    address: user.address ?? "",
+    photo_uri: user.photo_uri ?? "",
+    created_at: now,
+    updated_at: now,
+    sync_status: "pending"
+  });
 }
 
 /* -------------------------------------------------------
