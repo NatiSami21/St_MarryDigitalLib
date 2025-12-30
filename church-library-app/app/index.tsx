@@ -1,81 +1,50 @@
-// church-library-app/app/index.tsx     
-import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator } from "react-native";
+import { useEffect, useRef } from "react";
+import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
+import { VideoView, useVideoPlayer } from "expo-video";
 
-import { getSession, clearSession } from "../lib/session";
-import { getLibrarianByUsername, getLibrarianCount } from "../db/queries/librarians";
-import { getMetaValue } from "../db/queries/meta";
-
-export default function Index() {
+export default function IntroScreen() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const navigated = useRef(false); // 🔐 prevents double navigation
+
+  const goNext = () => {
+    if (navigated.current) return;
+    navigated.current = true;
+    router.replace("/app");
+  };
+
+  const player = useVideoPlayer(
+    require("../assets/intro-otona.mp4"),
+    (player) => {
+      player.loop = false;
+      player.play();
+    }
+  );
 
   useEffect(() => {
-    const bootstrap = async () => {
-      const session = await getSession();
-
-      // ------------------------------------------
-      // FIRST RUN CHECK
-      // ------------------------------------------
-      if (!session) {
-        const count = await getLibrarianCount();
-
-        if (count === 0) {
-          // No users → device is fresh → activation required
-          router.replace("/auth/bootstrap");
-        } else {
-          // Users exist → local login allowed
-          router.replace("/auth/login");
-        }
-        return;
-      }
-
-      // ------------------------------------------
-      // SESSION VALIDATION
-      // ------------------------------------------
-      const user = await getLibrarianByUsername(session.username);
-
-      if (!user || user.deleted === 1) {
-        await clearSession();
-        router.replace("/auth/login");
-        return;
-      }
-
-      // DEVICE BINDING CHECK
-      const deviceId = await getMetaValue("device_id");
-      if (user.device_id && user.device_id !== deviceId) {
-        await clearSession();
-        router.replace("/auth/login");
-        return;
-      }
-
-      // SESSION TIMEOUT CHECK (12 hours)
-      const age = Date.now() - (session.loggedInAt ?? 0);
-      const maxAge = 12 * 60 * 60 * 1000;
-
-      if (age > maxAge) {
-        await clearSession();
-        router.replace("/auth/login");
-        return;
-      }
-
-      // ------------------------------------------
-      // ROLE ROUTING
-      // ------------------------------------------
-      router.replace("/home"); // both admin and librarian go here
-    };
-
-    bootstrap().finally(() => setLoading(false));
+    const timeout = setTimeout(goNext, 4000);
+    return () => clearTimeout(timeout);
   }, []);
 
-  if (loading) {
-    return (
-      <View style={{flex: 1, justifyContent: "center", alignItems: "center"}}>
-        <ActivityIndicator size="large" color="#1e3a8a" />
-      </View>
-    );
-  }
+  useEffect(() => {
+    const sub = player.addListener("playToEnd", goNext);
+    return () => sub.remove();
+  }, [player]);
 
-  return null;
+  return (
+    <View style={styles.container}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        contentFit="cover"
+        allowsFullscreen={false}
+        allowsPictureInPicture={false}
+      />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "black" },
+  video: { width: "100%", height: "100%" },
+});

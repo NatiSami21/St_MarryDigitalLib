@@ -108,8 +108,8 @@ export default function Layout() {
     <SafeAreaProvider>
       <Stack screenOptions={{ headerShown: false }}>
         {/* Explicit startup order */}
-        <Stack.Screen name="intro" />
         <Stack.Screen name="index" />
+        <Stack.Screen name="app" />
       </Stack>
     </SafeAreaProvider>
   );
