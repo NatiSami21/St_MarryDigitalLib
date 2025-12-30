@@ -1,3 +1,4 @@
+// db/users.ts
 import { db } from "./sqlite";
 import { addCommit } from "./commits";
 

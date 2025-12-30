@@ -11,6 +11,7 @@ export const theme = {
     warning: '#F39C12',
     error: '#E74C3C',
     white: '#FFFFFF',
+    background: "#FDFBF7",
   },
   spacing: {
     xs: 4,

@@ -14,15 +14,16 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import { Ionicons } from '@expo/vector-icons';
 
-import PhotoPicker from "../../components/PhotoPicker";
 import { upsertUser } from "../../db/users";
 import { events } from "../../utils/events";
 import { getSession } from "../../lib/session";
 import { isInsideShift } from "../../utils/shift";
 import { theme } from "../../styles/theme";
 
-import { Ionicons } from '@expo/vector-icons';
+// PhotoPicker will be defined at the bottom of this file
+import PhotoPicker from "../../components/PhotoPicker";
 
 export default function RegisterUser() {
   const router = useRouter();
@@ -40,6 +41,11 @@ export default function RegisterUser() {
   
   // Validation states
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Debug photo URI
+  useEffect(() => {
+    console.log("Photo URI changed:", photoUri);
+  }, [photoUri]);
 
   useEffect(() => {
     if (params.fayda) {
@@ -155,6 +161,11 @@ export default function RegisterUser() {
     if (errors.phone) {
       setErrors(prev => ({ ...prev, phone: "" }));
     }
+  };
+
+  const handlePhotoChange = (uri: string) => {
+    console.log("Photo selected, URI:", uri);
+    setPhotoUri(uri);
   };
 
   const handleSave = async () => {
@@ -361,7 +372,7 @@ export default function RegisterUser() {
           <Text style={styles.sectionTitle}>Profile Photo</Text>
           <Text style={styles.sectionSubtitle}>Optional - Capture or upload a photo</Text>
           <View style={styles.photoContainer}>
-            <PhotoPicker imageUri={photoUri} onChange={setPhotoUri} />
+            <PhotoPicker imageUri={photoUri} onChange={handlePhotoChange} />
           </View>
         </View>
 
