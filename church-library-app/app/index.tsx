@@ -14,7 +14,7 @@ export default function IntroScreen() {
   };
 
   const player = useVideoPlayer(
-    require("../assets/intro-otona.mp4"),
+    require("../assets/intro.mp4"),
     (player) => {
       player.loop = false;
       player.play();

@@ -187,8 +187,8 @@ export default function LoginScreen() {
         {/* App Header Section */}
         <View style={styles.header}>
           <Icon name="book-open" size={48} color="#D4AF37" style={styles.headerIcon} />
-          <Text style={styles.appTitle}>Otona St.Mary </Text>
-          <Text style={styles.appSubtitle}>Library Management App</Text>
+          <Text style={styles.appTitle}>FAYDA </Text>
+          <Text style={styles.appSubtitle}>Smart Library Management</Text>
            
         </View>
 
