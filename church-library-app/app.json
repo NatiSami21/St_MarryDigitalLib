@@ -9,22 +9,18 @@
     "scheme": "churchlibraryapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
       "supportsTablet": true
     },
-
     "android": {
       "package": "com.anonymous.churchlibraryapp",
       "jsEngine": "hermes",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon-otona.png",
         "backgroundColor": "#ffffff"
       },
-
       "permissions": [
         "ACCESS_MEDIA_LOCATION",
         "android.permission.ACCESS_MEDIA_LOCATION",
@@ -34,12 +30,10 @@
         "android.permission.CAMERA"
       ]
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       [
         "expo-splash-screen",
@@ -63,14 +57,13 @@
       "expo-media-library",
       "expo-sqlite",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-video"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "eas": {
         "projectId": "148c26d2-cd12-414f-ae4a-ae98d7d4fa1e"

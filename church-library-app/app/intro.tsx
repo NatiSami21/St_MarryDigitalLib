@@ -1,12 +1,23 @@
-import React, { useEffect } from "react";
+// app/intro.tsx
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 
 export default function IntroScreen() {
   const router = useRouter();
 
-  // Fallback safety: if video fails or hangs, move on after 2.2s
+  const player = useVideoPlayer(
+    require("../assets/intro-otona.mp4"),
+    (player) => {
+      player.loop = false;
+      player.play();
+    }
+  );
+
+  /**
+   * Safety fallback (never block the app)
+   */
   useEffect(() => {
     const timer = setTimeout(() => {
       router.replace("/");
@@ -15,19 +26,25 @@ export default function IntroScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  /**
+   * Navigate when video ends
+   */
+  useEffect(() => {
+    const sub = player.addListener("playToEnd", () => {
+      router.replace("/");
+    });
+
+    return () => sub.remove();
+  }, [player]);
+
   return (
     <View style={styles.container}>
-      <Video
-        source={require("../assets/intro-otona.mp4")}
+      <VideoView
+        player={player}
         style={styles.video}
-        shouldPlay
-        isLooping={false}
-        resizeMode={ResizeMode.COVER}
-        onPlaybackStatusUpdate={(status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            router.replace("/");
-          }
-        }}
+        contentFit="cover"   // ✅ replaces resizeMode
+        allowsFullscreen={false}
+        allowsPictureInPicture={false}
       />
     </View>
   );
@@ -39,7 +56,6 @@ const styles = StyleSheet.create({
     backgroundColor: "black",
   },
   video: {
-    flex: 1,
     width: "100%",
     height: "100%",
   },
