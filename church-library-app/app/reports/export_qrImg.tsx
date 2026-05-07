@@ -54,8 +54,9 @@ export default function ExportQrImages() {
     }
   };
 
-  const sanitizeFileName = (name: string) =>
-    name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  const sanitizeFileName = (name: string) => {
+      return name.replace(/[\\/:*?"<>|]/g, "_").trim();
+    };
 
   const updateProgress = (current: number, total: number, step: string) => {
     setExportProgress({
@@ -97,33 +98,39 @@ export default function ExportQrImages() {
       let processedBooks = 0;
 
       // Step 3: Process books in smaller batches to avoid memory issues
-      const batchSize = 5; // Process 5 books at a time
+      const batchSize = 5; 
       for (let i = 0; i < totalBooks; i += batchSize) {
         const batch = books.slice(i, i + batchSize);
         console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(totalBooks/batchSize)}`);
         
         updateProgress(processedBooks, totalBooks, `Processing batch ${Math.floor(i/batchSize) + 1}...`);
 
-        // Process each book in the batch
         for (const book of batch) {
           try {
             console.log(`📖 Processing: ${book.title}`);
             updateProgress(processedBooks, totalBooks, `Processing: ${book.title.substring(0, 20)}...`);
             
-            const ref = qrRefs.current[book.id];
+            // 🛡️ SAFETY CHECK: If the ref is missing, wait briefly for the OS to render the component
+            let ref = qrRefs.current[book.id];
             if (!ref) {
-              console.warn(`⚠️ No QR ref for book ${book.id}, skipping`);
-              continue;
+              await new Promise(resolve => setTimeout(resolve, 150)); // 150ms delay for UI thread
+              ref = qrRefs.current[book.id];
             }
 
-            // Generate QR code as base64
+            if (!ref) {
+              console.warn(`⚠️ QR View missing for: ${book.title} (ID: ${book.id})`);
+              continue; 
+            }
+
             const base64 = await new Promise<string>((resolve, reject) => {
               try {
                 ref.toDataURL((data: string) => {
                   if (data) {
-                    resolve(data);
+                    // Clean the prefix "data:image/png;base64," if the library adds it
+                    const cleanBase64 = data.replace(/^data:image\/png;base64,/, "");
+                    resolve(cleanBase64);
                   } else {
-                    reject(new Error("Failed to generate QR code"));
+                    reject(new Error("QR generation returned empty data"));
                   }
                 });
               } catch (error) {
@@ -131,21 +138,22 @@ export default function ExportQrImages() {
               }
             });
 
+            // Sanitized name now preserves Amharic/Unicode characters
             const fileName = `${sanitizeFileName(book.title)}.png`;
             zip.file(fileName, base64, { base64: true });
             
             processedBooks++;
             updateProgress(processedBooks, totalBooks, `Added: ${book.title.substring(0, 20)}...`);
             
-            // Small delay to prevent UI freeze
-            await new Promise(resolve => setTimeout(resolve, 10));
+            // Tiny sleep to keep the UI responsive
+            await new Promise(resolve => setTimeout(resolve, 15));
             
           } catch (bookError) {
             console.error(`❌ Error processing book ${book.title}:`, bookError);
           }
         }
         
-        // Small delay between batches
+        // Short pause between batches to allow the garbage collector to work
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
@@ -388,10 +396,10 @@ const styles = StyleSheet.create({
   },
   hiddenQrZone: {
     position: "absolute",
-    opacity: 0.01,
-    height: 1,
-    width: 1,
-    overflow: "hidden",
+    width: 300, 
+    height: 300,
+    left: -10000, 
+    opacity: 0,
   },
   // Modal Styles
   modalOverlay: {
