@@ -16,6 +16,7 @@ import { Feather } from "@expo/vector-icons";
 import JSZip from "jszip";
 
 import * as Sharing from 'expo-sharing';
+import { captureRef } from "react-native-view-shot";
 
 import { getAllAsync } from "../../db/sqlite";
 
@@ -35,7 +36,7 @@ export default function ExportQrImages() {
     step: "",
   });
   const qrRefs = useRef<Record<number, any>>({});
-
+  
   useEffect(() => {
     loadBooks();
   }, []);
@@ -122,7 +123,8 @@ export default function ExportQrImages() {
               continue; 
             }
 
-            const base64 = await new Promise<string>((resolve, reject) => {
+            // toDataURL
+            /*const base64 = await new Promise<string>((resolve, reject) => {
               try {
                 ref.toDataURL((data: string) => {
                   if (data) {
@@ -138,7 +140,16 @@ export default function ExportQrImages() {
               }
             });
 
-            // Sanitized name now preserves Amharic/Unicode characters
+            */
+
+            // captureRef that can "photograph" a whole group of components at once.
+            const base64 = await captureRef(ref, {
+              format: "png",
+              quality: 1.0,
+              result: "base64",
+            });
+
+            // Sanitized, preserves Amharic/Unicode characters
             const fileName = `${sanitizeFileName(book.title)}.png`;
             zip.file(fileName, base64, { base64: true });
             
@@ -322,17 +333,18 @@ export default function ExportQrImages() {
         </View>
       </Modal>
 
-      {/* Hidden QR render zone (DO NOT REMOVE) */}
+      {/* Hidden QR render zone Wraps QR + Text together */}
       <ScrollView style={styles.hiddenQrZone}>
         {books.map((book) => (
-          <QRCode
+          <View
             key={book.id}
-            value={book.book_code}
-            size={200} // Smaller size for better performance
-            getRef={(c) => {
-              if (c) qrRefs.current[book.id] = c;
-            }}
-          />
+            ref={(el) => (qrRefs.current[book.id] = el)}
+            collapsable={false}
+            style={styles.qrCaptureContainer}
+          >
+            <QRCode value={book.book_code} size={250} />
+            <Text style={styles.qrLabelText}>{book.title}</Text>
+          </View>
         ))}
       </ScrollView>
     </View>
@@ -394,12 +406,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  // The Secret Sauce
   hiddenQrZone: {
     position: "absolute",
-    width: 300, 
-    height: 300,
+    width: 400, 
+    height: 400,
     left: -10000, 
-    opacity: 0,
+    opacity: 0.01,
+  },
+  qrCaptureContainer: {
+    backgroundColor: "white",
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 320, //  room for QR + Padding
+  },
+  qrLabelText: {
+    marginTop: 15,
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "black",
+    textAlign: "center",
   },
   // Modal Styles
   modalOverlay: {
