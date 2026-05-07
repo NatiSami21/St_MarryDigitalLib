@@ -170,14 +170,46 @@ export default function ExportQrImages() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Step 6: Save to gallery
-      console.log("🖼️ Saving to gallery...");
-      updateProgress(totalBooks, totalBooks, "Saving to gallery...");
+      // Step 6: Save to Downloads using SAF
+      console.log("📥 Saving to Downloads...");
+      updateProgress(totalBooks, totalBooks, "Finalizing download...");
       
-      const asset = await MediaLibrary.createAssetAsync(zipPath);
-      await MediaLibrary.createAlbumAsync("FAYDA Library", asset, false);
-
-      // Step 7: Clean up
+      try {
+        // Request permission to a specific folder (the user picks 'Downloads' once)
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        
+        if (permissions.granted) {
+          // Read the ZIP file you just created in cache as Base64
+          const base64Data = await FileSystem.readAsStringAsync(zipPath, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+      
+          // Create the file in the directory the user selected
+          const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            zipFileName,
+            'application/zip'
+          );
+      
+          // Write the data to the new file
+          await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+      
+          console.log("✅ File saved to Downloads successfully!");
+        } else {
+          // Fallback: If they cancel the folder picker, use the Share sheet so the file isn't lost
+          import * as Sharing from 'expo-sharing';
+          await Sharing.shareAsync(zipPath);
+        }
+      } catch (safError) {
+        console.error("SAF Error:", safError);
+        // Emergency fallback to Sharing if SAF fails
+        import * as Sharing from 'expo-sharing';
+        await Sharing.shareAsync(zipPath);
+      }
+      
+      // Step 7: Clean up cache
       console.log("🧹 Cleaning up...");
       await FileSystem.deleteAsync(zipPath).catch(() => {});
 
