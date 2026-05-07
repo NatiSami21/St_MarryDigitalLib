@@ -14,6 +14,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
 import JSZip from "jszip";
+
 import * as Sharing from 'expo-sharing';
 
 import { getAllAsync } from "../../db/sqlite";
@@ -205,7 +206,6 @@ export default function ExportQrImages() {
       } catch (safError) {
         console.error("SAF Error:", safError);
         // Emergency fallback to Sharing if SAF fails
-        import * as Sharing from 'expo-sharing';
         await Sharing.shareAsync(zipPath);
       }
       
