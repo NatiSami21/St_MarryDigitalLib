@@ -123,6 +123,9 @@ export default function ExportQrImages() {
               continue; 
             }
 
+            // the SVG time to physically paint the pixels
+            await new Promise(resolve => setTimeout(resolve, 50));
+
             // toDataURL
             /*const base64 = await new Promise<string>((resolve, reject) => {
               try {
@@ -334,7 +337,7 @@ export default function ExportQrImages() {
       </Modal>
 
       {/* Hidden QR render zone Wraps QR + Text together */}
-      <ScrollView style={styles.hiddenQrZone}>
+      <View style={styles.hiddenQrZone} pointerEvents="none">
         {books.map((book) => (
           <View
             key={book.id}
@@ -346,7 +349,7 @@ export default function ExportQrImages() {
             <Text style={styles.qrLabelText}>{book.title}</Text>
           </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -407,11 +410,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   // The Secret Sauce
+  // The Secret Sauce
   hiddenQrZone: {
     position: "absolute",
-    width: 400, 
-    height: 400,
-    left: -10000, 
+    top: 0,
+    left: 0,
+    zIndex: -100, // Put it behind the main app background
     opacity: 0.01,
   },
   qrCaptureContainer: {
@@ -419,7 +423,8 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
-    width: 320, //  room for QR + Padding
+    width: 320, 
+    minHeight: 350, // minHeight to guarantee bounds before capture
   },
   qrLabelText: {
     marginTop: 15,
